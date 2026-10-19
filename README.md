@@ -1,11 +1,10 @@
 # 🗄️ lsql
 
-**lsql** is a terminal GUI for browsing and managing [LanceDB](https://lancedb.com/)
-databases. Pick a database and a table visually,
-then run slash commands against whatever's selected — no more retyping paths and table
-names for every single query.
+**lsql** is a TUI for managing [LanceDB](https://lancedb.com/) databases easily. Pick a
+database and a table visually, then run slash commands against whatever's selected — no
+more retyping paths and table names for every single query.
 
-![launch screenshot](docs/screenshots/01-launch.svg)
+![launch screenshot](https://raw.githubusercontent.com/wuqunfei/lsql/main/docs/screenshots/01-launch.svg)
 
 ---
 
@@ -54,7 +53,7 @@ Type a path directly and hit Enter, or click **Open...** to pick a folder visual
 an **Up** button to walk back up the directory tree). The 🌙/☀️ icon next to it toggles
 light/dark theme — it defaults to whatever your OS is currently using.
 
-![browse database screenshot](docs/screenshots/02-browse-database.svg)
+![browse database screenshot](https://raw.githubusercontent.com/wuqunfei/lsql/main/docs/screenshots/02-browse-database.svg)
 
 Opening a path that doesn't exist yet creates a database there — same as running
 `/create --path <path>`.
@@ -63,7 +62,7 @@ Opening a path that doesn't exist yet creates a database there — same as runni
 
 Click any table in the list to select it and immediately see its first 100 rows.
 
-![table selected screenshot](docs/screenshots/03-table-selected.svg)
+![table selected screenshot](https://raw.githubusercontent.com/wuqunfei/lsql/main/docs/screenshots/03-table-selected.svg)
 
 ### 3️⃣ Command input — slash commands with live suggestions
 
@@ -71,30 +70,30 @@ Start typing `/` and a filtered dropdown of matching commands appears. Use `↑`
 pick one, `Tab` or `Enter` to accept it, `Esc` to dismiss. `↑`/`↓` also recall previous
 commands when the dropdown isn't open.
 
-![slash command suggestions screenshot](docs/screenshots/04-slash-suggestions.svg)
+![slash command suggestions screenshot](https://raw.githubusercontent.com/wuqunfei/lsql/main/docs/screenshots/04-slash-suggestions.svg)
 
 Forgot a flag? `/help` lists every command, and `/help <command>` shows its full usage:
 
-![help command screenshot](docs/screenshots/06-help.svg)
+![help command screenshot](https://raw.githubusercontent.com/wuqunfei/lsql/main/docs/screenshots/06-help.svg)
 
 ### 4️⃣ Results — tables, schemas, and safety checks
 
 `/schema` renders a table's columns and types right in the results panel:
 
-![schema screenshot](docs/screenshots/05-schema.svg)
+![schema screenshot](https://raw.githubusercontent.com/wuqunfei/lsql/main/docs/screenshots/05-schema.svg)
 
 Destructive commands always confirm first:
 
-![confirm destructive command screenshot](docs/screenshots/07-confirm-destructive.svg)
+![confirm destructive command screenshot](https://raw.githubusercontent.com/wuqunfei/lsql/main/docs/screenshots/07-confirm-destructive.svg)
 
 Large results are paginated — 100 rows per page, with `< Prev` / `Next >` controls:
 
-![pagination screenshot](docs/screenshots/08-pagination.svg)
+![pagination screenshot](https://raw.githubusercontent.com/wuqunfei/lsql/main/docs/screenshots/08-pagination.svg)
 
 And if a cell's value is too long to read in the table, double-click it to see the full
 text, copy it, or edit it and write the change back to the table:
 
-![cell detail popup screenshot](docs/screenshots/09-cell-detail.svg)
+![cell detail popup screenshot](https://raw.githubusercontent.com/wuqunfei/lsql/main/docs/screenshots/09-cell-detail.svg)
 
 ---
 

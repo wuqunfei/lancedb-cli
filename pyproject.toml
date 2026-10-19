@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "lsql"
 dynamic = ["version"]
-description = "A terminal GUI for browsing and managing LanceDB databases"
+description = "A TUI for managing LanceDB databases easily"
 readme = "README.md"
 license = {text = "Apache-2.0"}
 requires-python = ">=3.10"
