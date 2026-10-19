@@ -35,6 +35,7 @@ dependencies = [
     "typer>=0.27.0",
     "rich>=15.0.0",
     "textual>=8.2.0",
+    "sentence-transformers>=3.0.0",
 ]
 
 [project.optional-dependencies]
@@ -68,6 +69,8 @@ lsql = ["tui/*.tcss"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+markers = ["slow: downloads a real ~80MB model from Hugging Face; run with -m slow"]
+addopts = "-m 'not slow'"
 
 [tool.black]
 line-length = 100
