@@ -46,7 +46,7 @@ This project includes GitHub Actions workflows to automatically build and publis
 
 ### Step 4: Configure your package
 
-Make sure these values are updated in `pyproject.toml` and `setup.py`:
+Make sure these values are updated in `pyproject.toml`:
 - `name` - Your package name (e.g., `lancedb-cli`)
 - `version` - Current version (e.g., `0.1.0`)
 - `author` - Your name
@@ -70,9 +70,9 @@ twine upload dist/*
 Once everything is configured, publishing is simple:
 
 ```bash
-# 1. Update version in pyproject.toml and setup.py
+# 1. Update __version__ in lancedb_cli/__init__.py
 # 2. Commit changes
-git add pyproject.toml setup.py
+git add lancedb_cli/__init__.py
 git commit -m "Bump version to 0.2.0"
 
 # 3. Create and push a tag

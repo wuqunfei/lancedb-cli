@@ -1,212 +1,164 @@
-# lancedb-cli
+# 🗄️ lancedb-cli
 
-A minimal command line application for managing LanceDB databases. This CLI tool provides an easy interface to query, update, and manage data stored in LanceDB.
+**`lsql`** is a terminal GUI for browsing and managing [LanceDB](https://lancedb.com/)
+databases. Pick a database and a table visually, then run slash commands against
+whatever's selected — no more retyping paths and table names for every single query.
 
-## Features
+![launch screenshot](docs/screenshots/01-launch.svg)
 
-- **Query Tables**: Retrieve data from LanceDB tables with filtering and column selection
-- **Interactive Mode**: Interactive SQL shell with command history and completion
-- **Direct SQL Execution**: Run complex SQL queries against LanceDB databases via DuckDB integration
-- **Data Management**: Insert, update, delete, and drop records
-- **Schema Inspection**: View the schema of tables
-- **Import/Export**: Load data from CSV files and dump tables to CSV format
-- **Multiple Output Formats**: Display results as formatted tables or JSON
-- **Auto-completion**: Interactive mode includes SQL keywords and table name completion
-- **Safe Operations**: Confirmation prompts for destructive operations
+---
 
-## Installation
+## ✨ Features
 
-Install the package using pip:
+- 🖥️ **Four-panel layout** — database picker, table list, command input, and results,
+  all on one screen
+- 📁 **Folder-browser dialog** — open an existing database by browsing to it, no need
+  to memorize or hand-type paths
+- ⚡ **Slash commands with auto-suggestion** — type `/` and see every available command,
+  filtered live as you type
+- 🖱️ **Click a table to preview it** — instantly runs `select * from <table> limit 100`
+  for you
+- 🔍 **Double-click any cell** — pop open the full, untruncated value when a row is too
+  wide to read comfortably
+- 📄 **Pagination** — large result sets are paged 100 rows at a time instead of flooding
+  the screen
+- 🧮 **Raw SQL via DuckDB** — `/sql` runs across every table in the database
+- 🛟 **Confirmation dialogs** — `/drop`, `/empty`, and `/delete` always ask first
+- ⏪ **Command history** — up/down arrow recall, just like a shell
+- 📚 **Built-in help** — `/help` lists every command; `/help <command>` shows its flags
+
+---
+
+## 📦 Installation
 
 ```bash
 pip install lancedb-cli
 ```
 
-## Usage
-
-### Command Line
-
-#### Database and Table Management
-
-List all tables in a database:
+## 🚀 Quick Start
 
 ```bash
-lsql list-tables /path/to/database
+lsql                      # launch the TUI
+lsql /path/to/database    # launch pre-connected to a database
 ```
 
-View table schema:
+---
+
+## 🧭 A tour of the four panels
+
+### 1️⃣ Database — pick, type, or browse
+
+Recently-opened databases show up in a list for one click reopening. You can also type a
+path directly and hit Enter, or click **Browse...** to pick a folder visually (with an
+**Up** button to walk back up the directory tree).
+
+![browse database screenshot](docs/screenshots/02-browse-database.svg)
+
+Opening a path that doesn't exist yet creates a database there — same as running
+`/create --path <path>`.
+
+### 2️⃣ Tables — click to preview
+
+Click any table in the list to select it and immediately see its first 100 rows.
+
+![table selected screenshot](docs/screenshots/03-table-selected.svg)
+
+### 3️⃣ Command input — slash commands with live suggestions
+
+Start typing `/` and a filtered dropdown of matching commands appears. Use `↑`/`↓` to
+pick one, `Tab` or `Enter` to accept it, `Esc` to dismiss. `↑`/`↓` also recall previous
+commands when the dropdown isn't open.
+
+![slash command suggestions screenshot](docs/screenshots/04-slash-suggestions.svg)
+
+Forgot a flag? `/help` lists every command, and `/help <command>` shows its full usage:
+
+![help command screenshot](docs/screenshots/06-help.svg)
+
+### 4️⃣ Results — tables, schemas, and safety checks
+
+`/schema` renders a table's columns and types right in the results panel:
+
+![schema screenshot](docs/screenshots/05-schema.svg)
+
+Destructive commands always confirm first:
+
+![confirm destructive command screenshot](docs/screenshots/07-confirm-destructive.svg)
+
+Large results are paginated — 100 rows per page, with `< Prev` / `Next >` controls:
+
+![pagination screenshot](docs/screenshots/08-pagination.svg)
+
+And if a cell's value is too long to read in the table, double-click it for the full
+text:
+
+![cell detail popup screenshot](docs/screenshots/09-cell-detail.svg)
+
+---
+
+## ⌨️ Command reference
+
+Commands that operate on a table (`query`, `schema`, `delete`, `empty`, `drop`, `update`,
+`dump`) always act on whichever table is currently selected in the table list — select
+it there rather than naming it in the command.
+
+| Command | What it does |
+|---|---|
+| `/create --path <path>` | Create (or open) a database at `path` |
+| `/query [--where ...] [--limit 10] [--select "a,b"] [--output table\|json]` | Query the current table |
+| `/schema` | Show the current table's schema |
+| `/sql <SQL query>` | Raw SQL across **every** table — the one command that ignores the table selection |
+| `/update --set-clause "col='val'" --where "..."` | Update rows in the current table |
+| `/delete --where "..."` | Delete rows from the current table |
+| `/empty` | Delete all rows from the current table |
+| `/drop` | Drop the current table entirely |
+| `/load --path file.csv --table name [--overwrite]` | Load a CSV into a new table |
+| `/dump --path out.csv [--overwrite]` | Dump the current table to CSV |
+| `/refresh` | Refresh the table list and SQL views |
+| `/help [command]` | Show all commands, or details for one |
+| `/exit` | Quit |
+
+`/drop`, `/empty`, and `/delete` pop a confirmation dialog before running. `/load`
+creates a brand-new table, so it takes an explicit `--table` name instead of using the
+current selection.
+
+---
+
+## 🛠️ Development
 
 ```bash
-lsql schema /path/to/database my_table
-```
-
-#### Querying Data
-
-Query a table with filtering and limits:
-
-```bash
-lsql query /path/to/database my_table --limit 10
-lsql query /path/to/database my_table --where "age > 25" --limit 20
-lsql query /path/to/database my_table --select "name,email" --where "active=true"
-```
-
-Execute SQL queries directly (using DuckDB):
-
-```bash
-lsql sql /path/to/database "SELECT * FROM my_table WHERE id > 5"
-lsql sql /path/to/database "SELECT name, COUNT(*) FROM my_table GROUP BY name"
-```
-
-#### Data Modification
-
-Update records:
-
-```bash
-lsql update /path/to/database my_table \
-  --set-clause "name='John',age=30" \
-  --where "id=1"
-```
-
-Delete specific records:
-
-```bash
-lsql delete /path/to/database my_table --where "id=1"
-lsql delete /path/to/database my_table --where "age < 18"
-```
-
-Empty a table (delete all rows):
-
-```bash
-lsql empty /path/to/database my_table
-```
-
-Drop a table permanently:
-
-```bash
-lsql drop /path/to/database my_table --confirm
-```
-
-#### Import/Export
-
-Load data from a CSV file:
-
-```bash
-lsql load /path/to/database my_file.csv my_table
-lsql load /path/to/database my_file.csv my_table --overwrite
-```
-
-Export a table to CSV:
-
-```bash
-lsql dump /path/to/database my_table output.csv
-lsql dump /path/to/database employees export.csv --overwrite
-```
-
-### Interactive Mode
-
-Start an interactive session:
-
-```bash
-lsql interactive /path/to/database
-```
-
-Inside the interactive shell, you can:
-
-- Type SQL queries directly
-- Use special commands:
-  - `.tables` - List all tables
-  - `.schema <table>` - Show table schema
-  - `.refresh` - Refresh all table views
-  - `.update <table> <set> <where>` - Update rows
-  - `.delete <table> <where>` - Delete rows
-  - `.empty <table>` - Empty a table
-  - `.drop <table>` - Drop a table
-  - `.exit` - Exit the interactive shell
-
-## Command Options
-
-### Common Options
-
-- `--create`: Create the database if it doesn't exist (available on most commands)
-- `--output <format>`: Output format - `table` (default) or `json` (for query and sql commands)
-
-### Query Command Options
-
-- `--limit N`: Limit results to N rows (default: 10)
-- `--where <condition>`: Filter rows with SQL WHERE clause
-- `--select <columns>`: Select specific columns (comma-separated)
-
-### Update/Delete Options
-
-- `--set-clause <values>`: Column=value pairs for updates (e.g., "name='John',age=30")
-- `--where <condition>`: SQL WHERE clause to specify which rows to modify
-
-### Import/Export Options
-
-- `--overwrite`: Overwrite existing table (load) or file (dump) if it exists
-
-### Safety Options
-
-- `--confirm`: Skip confirmation prompts for destructive operations (drop command)
-
-## Development
-
-To set up a development environment:
-
-```bash
-git clone https://github.com/yourusername/lancedb-cli.git
+git clone https://github.com/codref/lancedb-cli.git
 cd lancedb-cli
 pip install -e ".[dev]"
 ```
 
-Run tests:
+Run the tests:
 
 ```bash
 pytest
 ```
 
-## Requirements
-
-- Python 3.8 or higher
-- lancedb
-- duckdb
-- typer
-- rich
-- prompt-toolkit
-- pygments
-
-## Examples
-
-### Complete Workflow Example
+Regenerate the screenshots above after a visible UI change:
 
 ```bash
-# Create a new database and load data
-lsql load ./my_db employees.csv employees --create
-
-# Query the data
-lsql query ./my_db employees --limit 5
-
-# Run SQL analytics
-lsql sql ./my_db "SELECT department, AVG(salary) FROM employees GROUP BY department"
-
-# Update specific records
-lsql update ./my_db employees --set-clause "salary=50000" --where "id=10"
-
-# Export results
-lsql dump ./my_db employees employees_backup.csv
-
-# Interactive exploration
-lsql interactive ./my_db
+python scripts/generate_screenshots.py
 ```
 
-## License
+### Requirements
 
-Apache License 2.0 - see LICENSE file for details
+- Python 3.9+
+- lancedb, duckdb, pandas, typer, rich, textual
 
-## Contributing
+---
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+## 🤝 Contributing
 
-## Issues
+Contributions are welcome! Please feel free to open a PR.
 
-If you encounter any issues or have suggestions, please open an issue on GitHub.
+## 🐛 Issues
+
+Found a bug or have an idea? [Open an issue](https://github.com/codref/lancedb-cli/issues).
+
+## 📄 License
+
+Apache License 2.0 — see [LICENSE](LICENSE) for details.

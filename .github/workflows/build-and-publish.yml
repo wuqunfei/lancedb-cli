@@ -27,7 +27,15 @@ jobs:
     
     - name: Check package with twine
       run: twine check dist/*
-    
+
+    - name: Smoke-test the built wheel in a fresh venv
+      run: |
+        python -m venv /tmp/wheel-check
+        /tmp/wheel-check/bin/pip install --upgrade pip
+        /tmp/wheel-check/bin/pip install dist/*.whl
+        /tmp/wheel-check/bin/lsql --help > /dev/null && echo "✓ lsql --help works from installed wheel"
+        /tmp/wheel-check/bin/python -c "import lancedb_cli, pathlib; css = pathlib.Path(lancedb_cli.__file__).parent / 'tui' / 'app.tcss'; assert css.exists(), f'{css} missing from installed wheel'; print('✓ tui/app.tcss packaged correctly')"
+
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:

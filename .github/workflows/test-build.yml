@@ -24,14 +24,13 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -e .
-        pip install pytest pytest-cov
-    
+        pip install -e ".[dev]"
+
     - name: Test import
       run: python -c "from lancedb_cli.__main__ import main; print('✓ Import successful')"
-    
+
     - name: Test help command
       run: python -m lancedb_cli --help > /dev/null && echo "✓ Help command works"
-    
-    - name: Run tests (if any)
-      run: pytest tests/ -v --tb=short 2>/dev/null || echo "No tests found"
+
+    - name: Run tests
+      run: pytest tests/ -v --tb=short
