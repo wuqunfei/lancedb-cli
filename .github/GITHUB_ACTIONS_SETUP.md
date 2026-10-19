@@ -10,11 +10,11 @@ This project includes GitHub Actions workflows to automatically build and publis
 - Runs on every push to `main` or `develop` branches
 - Runs on all pull requests
 
-### 2. **release.yml** (Triggered on tags)
-- Builds the package distribution
-- Validates with `twine`
+### 2. **release.yml** (Triggered on tags, or manually)
+- Builds the package distribution with `uv build`
+- Smoke-tests the built wheel
 - Publishes to PyPI via [trusted publishing](https://docs.pypi.org/trusted-publishers/) (OIDC) — no API token stored in GitHub
-- Triggers automatically when you push a tag matching `v*` (e.g., `v0.1.0`)
+- Triggers automatically when you push a tag matching `v*` (e.g., `v0.1.0`), or manually via `workflow_dispatch`
 
 ## Setup Instructions
 
@@ -72,8 +72,8 @@ git push origin v0.2.0
 ```
 
 The GitHub Action will automatically:
-- ✅ Build the package
-- ✅ Validate it with twine
+- ✅ Build the package with `uv build`
+- ✅ Smoke-test the built wheel
 - ✅ Upload to PyPI via trusted publishing
 - ✅ Create a GitHub Release (optional - requires permissions)
 
