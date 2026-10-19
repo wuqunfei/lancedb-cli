@@ -1,7 +1,7 @@
 """Confirmation dialog shown before destructive commands (/drop, /empty, /delete)."""
 
 from textual.app import ComposeResult
-from textual.containers import Grid
+from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Button, Label
 
@@ -18,10 +18,13 @@ class ConfirmModal(ModalScreen[bool]):
         super().__init__()
 
     def compose(self) -> ComposeResult:
-        yield Grid(
+        yield Vertical(
             Label(self.message, id="confirm-message"),
-            Button("Yes", id="confirm-yes", variant="error"),
-            Button("No", id="confirm-no", variant="primary"),
+            Horizontal(
+                Button("Yes", id="confirm-yes"),
+                Button("No", id="confirm-no"),
+                id="confirm-buttons",
+            ),
             id="confirm-dialog",
         )
 

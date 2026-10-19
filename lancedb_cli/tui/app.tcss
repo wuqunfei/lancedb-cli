@@ -120,19 +120,30 @@ ConfirmModal {
 }
 
 #confirm-dialog {
-    grid-size: 2 2;
-    grid-gutter: 1 2;
-    padding: 1 2;
     width: 60;
-    height: 11;
+    height: auto;
+    padding: 1 2;
     border: thick $error;
     background: $surface;
 }
 
 #confirm-message {
-    column-span: 2;
     width: 1fr;
     content-align: center middle;
+    margin-bottom: 1;
+}
+
+#confirm-buttons {
+    height: 1;
+    align: center middle;
+}
+
+#confirm-yes, #confirm-no {
+    height: 1;
+    min-width: 0;
+    border: none;
+    padding: 0 1;
+    margin: 0 1;
 }
 
 DirectoryBrowserModal {
