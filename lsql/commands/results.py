@@ -15,6 +15,7 @@ class AppState:
     connection: Any = None
     current_db_path: Optional[str] = None
     current_table: Optional[str] = None
+    current_embedding_model: Optional[str] = None
 
 
 @dataclass

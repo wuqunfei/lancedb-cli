@@ -3,7 +3,7 @@
 import argparse
 
 from ..core import db, rendering
-from ..core.parsing import parse_set_clause
+from ..core.parsing import parse_embedding_columns, parse_set_clause
 from . import results as r
 from .results import AppState
 
@@ -70,6 +70,26 @@ def cmd_load(state: AppState, args: argparse.Namespace) -> r.CommandResult:
     df = db.load_csv(state.connection, args.path, args.table, overwrite=args.overwrite)
     return r.ok_text(
         rendering.format_status(f"Loaded {len(df)} row(s) into '{args.table}'"),
+        refresh_tables=True,
+    )
+
+
+def cmd_embedding(state: AppState, args: argparse.Namespace) -> r.CommandResult:
+    source_cols, target_cols = parse_embedding_columns(args.source, args.target)
+    model_name = args.model or state.current_embedding_model or db.DEFAULT_EMBEDDING_MODEL
+    df = db.embed_table(
+        state.connection,
+        args.table,
+        source_cols,
+        target_cols,
+        model_name=model_name,
+        overwrite=args.overwrite,
+    )
+    pairs = ", ".join(f"{s}->{t}" for s, t in zip(source_cols, target_cols))
+    return r.ok_text(
+        rendering.format_status(
+            f"Computed embeddings for {len(df)} row(s) in '{args.table}' ({pairs}) using '{model_name}'"
+        ),
         refresh_tables=True,
     )
 

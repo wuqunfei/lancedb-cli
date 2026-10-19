@@ -18,6 +18,24 @@ def state(tmp_path):
     return AppState(connection=conn, current_db_path=str(tmp_path / "mydb.lance"), current_table="people")
 
 
+@pytest.fixture
+def fake_embedding(monkeypatch):
+    """Records every model name requested and returns a deterministic 2-dim stand-in,
+    so these tests never download a real model."""
+    calls = []
+
+    class _FakeEmbed:
+        def generate_embeddings(self, texts):
+            return [[float(len(t)), 0.0] for t in texts]
+
+    def fake_get(name):
+        calls.append(name)
+        return _FakeEmbed()
+
+    monkeypatch.setattr(db, "get_embedding_function", fake_get)
+    return calls
+
+
 def run(state, line):
     prepared = registry.prepare(state, line)
     assert isinstance(prepared, PreparedCommand), f"expected PreparedCommand, got {prepared!r}"
@@ -134,3 +152,42 @@ def test_refresh_flags_table_refresh(state):
 def test_bad_flag_value_is_an_error_not_a_crash(state):
     result = registry.prepare(state, "/query --output xml")
     assert result.kind == "error"
+
+
+def test_embedding_does_not_require_current_table(state, fake_embedding):
+    state.current_table = None
+    result = run(state, "/embedding --table people --source name")
+    assert result.kind == "text"
+    assert result.refresh_tables is True
+    assert "vector" in db.get_schema(state.connection, "people").names
+
+
+def test_embedding_is_destructive_and_confirm_message_names_table(state, fake_embedding):
+    prepared = registry.prepare(state, "/embedding --table people --source name")
+    assert isinstance(prepared, PreparedCommand)
+    assert prepared.confirm_message is not None
+    assert "people" in prepared.confirm_message
+
+
+def test_embedding_uses_explicit_model_flag(state, fake_embedding):
+    run(state, "/embedding --table people --source name --model org/explicit-model")
+    assert fake_embedding == ["org/explicit-model"]
+
+
+def test_embedding_uses_state_model_when_no_flag(state, fake_embedding):
+    state.current_embedding_model = "org/panel-model"
+    run(state, "/embedding --table people --source name")
+    assert fake_embedding == ["org/panel-model"]
+
+
+def test_embedding_falls_back_to_default_model(state, fake_embedding):
+    run(state, "/embedding --table people --source name")
+    assert fake_embedding == [db.DEFAULT_EMBEDDING_MODEL]
+
+
+def test_embedding_multi_column(state, fake_embedding):
+    result = run(state, "/embedding --table people --source name,city")
+    assert result.kind == "text"
+    names = db.get_schema(state.connection, "people").names
+    assert "name_vector" in names
+    assert "city_vector" in names

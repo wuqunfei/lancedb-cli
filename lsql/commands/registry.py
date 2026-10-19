@@ -118,6 +118,18 @@ COMMANDS = {
         needs_table=False,
         help_text="Load a CSV into a new table (--path/--table/--overwrite)",
     ),
+    "embedding": CommandSpec(
+        "embedding",
+        handlers.cmd_embedding,
+        parser.build_embedding_parser,
+        needs_table=False,
+        destructive=True,
+        confirm_template=(
+            "Compute embeddings for table '{table}' ({source} -> {target})? "
+            "This rewrites the entire table."
+        ),
+        help_text="Compute embeddings for a table (--table/--source/--target/--model/--overwrite)",
+    ),
     "dump": CommandSpec(
         "dump",
         handlers.cmd_dump,
