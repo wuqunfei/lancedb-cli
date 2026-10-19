@@ -103,6 +103,33 @@ def build_load_parser() -> SilentArgumentParser:
     return p
 
 
+def build_embedding_parser() -> SilentArgumentParser:
+    p = _new_parser("embedding")
+    p.add_argument("--table", required=True, help="Name of the table to compute embeddings for")
+    p.add_argument(
+        "--source",
+        required=True,
+        help="Source column(s) to embed, comma-separated for multiple (e.g. 'title,body')",
+    )
+    p.add_argument(
+        "--target",
+        default=None,
+        help=(
+            "Target vector column(s), comma-separated, paired positionally with --source. "
+            "Defaults to 'vector' for a single --source column, or '<source>_vector' per "
+            "column when --source names multiple columns"
+        ),
+    )
+    p.add_argument(
+        "--model",
+        default=None,
+        help="sentence-transformers model name (default: all-MiniLM-L6-v2, or whatever's "
+        "set in the Embedding Model panel)",
+    )
+    p.add_argument("--overwrite", action="store_true", help="Overwrite target column(s) if they already exist")
+    return p
+
+
 def build_dump_parser() -> SilentArgumentParser:
     p = _new_parser("dump")
     p.add_argument("--path", required=True, help="Output CSV file path")

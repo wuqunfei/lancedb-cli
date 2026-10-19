@@ -3,6 +3,7 @@ import pytest
 from lsql.commands.parser import (
     ArgParseExit,
     build_delete_parser,
+    build_embedding_parser,
     build_load_parser,
     build_query_parser,
     split_first_token,
@@ -71,6 +72,38 @@ def test_load_parser_requires_path_and_table():
     args = build_load_parser().parse_args(["--path", "x.csv", "--table", "t", "--overwrite"])
     assert args.path == "x.csv"
     assert args.table == "t"
+    assert args.overwrite is True
+
+
+def test_embedding_parser_requires_table_and_source():
+    with pytest.raises(ArgParseExit):
+        build_embedding_parser().parse_args(["--table", "people"])
+    args = build_embedding_parser().parse_args(["--table", "people", "--source", "name"])
+    assert args.table == "people"
+    assert args.source == "name"
+
+
+def test_embedding_parser_defaults():
+    args = build_embedding_parser().parse_args(["--table", "people", "--source", "name"])
+    assert args.target is None
+    assert args.model is None
+    assert args.overwrite is False
+
+
+def test_embedding_parser_parses_all_flags():
+    args = build_embedding_parser().parse_args(
+        [
+            "--table", "people",
+            "--source", "name,city",
+            "--target", "vec1,vec2",
+            "--model", "org/model",
+            "--overwrite",
+        ]
+    )
+    assert args.table == "people"
+    assert args.source == "name,city"
+    assert args.target == "vec1,vec2"
+    assert args.model == "org/model"
     assert args.overwrite is True
 
 
