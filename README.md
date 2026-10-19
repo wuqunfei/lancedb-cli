@@ -1,7 +1,7 @@
 # 🗄️ lancedbx
 
 **lancedbx** is a terminal GUI for browsing and managing [LanceDB](https://lancedb.com/)
-databases — launched with the `dbx` command. Pick a database and a table visually,
+databases — launched with the `lsql` command. Pick a database and a table visually,
 then run slash commands against whatever's selected — no more retyping paths and table
 names for every single query.
 
@@ -40,8 +40,8 @@ pip install lancedbx
 ## 🚀 Quick Start
 
 ```bash
-dbx                       # launch the TUI
-dbx /path/to/database     # launch pre-connected to a database
+lsql                      # launch the TUI
+lsql /path/to/database    # launch pre-connected to a database
 ```
 
 ---

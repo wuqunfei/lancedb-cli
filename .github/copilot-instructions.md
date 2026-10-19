@@ -2,12 +2,12 @@
 
 ## Project Overview
 
-`dbx` is a terminal GUI (Textual) for managing LanceDB databases. It is **not** a
+`lsql` is a terminal GUI (Textual) for managing LanceDB databases. It is **not** a
 flat one-shot CLI — the only interface is the four-panel TUI: a database picker, a
 table list, a slash-command input, and a results panel. SQL execution across tables
 is handled via DuckDB integration.
 
-**Command Name:** `dbx`
+**Command Name:** `lsql`
 **Main Technologies:** LanceDB, DuckDB, Textual, Typer (launcher only), Rich, pandas
 
 ## Architecture
