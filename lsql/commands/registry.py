@@ -125,7 +125,7 @@ COMMANDS = {
         needs_table=False,
         destructive=True,
         confirm_template=(
-            "Compute embeddings for table '{table}' ({source} -> {target})? "
+            "Compute embeddings for table '{table}' from column(s) '{source}'? "
             "This rewrites the entire table."
         ),
         help_text="Compute embeddings for a table (--table/--source/--target/--model/--overwrite)",

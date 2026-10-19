@@ -231,6 +231,18 @@ def get_embedding_function(model_name: str):
     function by name. The .create() call is what triggers huggingface_hub's download
     + local cache on first use of a given model — no custom downloader needed."""
     try:
+        # transformers' "Loading weights" progress bar makes tqdm construct a
+        # multiprocessing.RLock() to coordinate output across forked processes. Inside
+        # a running Textual app's raw-mode terminal, registering that lock spawns
+        # Python's resource_tracker subprocess, which can fail with "bad value(s) in
+        # fds_to_keep" and crash the whole load — even though we never fork child
+        # processes and have no use for a multiprocessing-safe tqdm lock. Pre-setting
+        # mp_lock makes tqdm skip constructing one at all (create_mp_lock no-ops once
+        # the class attribute already exists).
+        import tqdm.std
+
+        tqdm.std.TqdmDefaultWriteLock.mp_lock = None
+
         from lancedb.embeddings import get_registry
 
         return get_registry().get("sentence-transformers").create(name=model_name)
@@ -277,13 +289,21 @@ def embed_table(
     df = tbl.to_pandas()
 
     try:
+        # Compute every embedding from the untouched original columns first, then
+        # assign them all afterward — if a pair's target name collides with a later
+        # pair's source name (e.g. --source city,name --target name,final), computing
+        # and assigning in a single pass would make the later pair embed the vector
+        # just written into that column instead of the real source text.
+        computed = {}
         for source_col, target_col in zip(source_columns, target_columns):
             texts = df[source_col].fillna("").astype(str).tolist()
             embeddings = embed_fn.generate_embeddings(texts)
             # One np.ndarray per row (not a nested python list) — needed so lancedb's
             # pandas->arrow conversion infers FixedSizeList<float32>, not a variable-
             # length List, which is required for vector search to work on the result.
-            df[target_col] = list(np.asarray(embeddings, dtype=np.float32))
+            computed[target_col] = list(np.asarray(embeddings, dtype=np.float32))
+        for target_col, values in computed.items():
+            df[target_col] = values
     except Exception as e:
         raise CommandError(f"Embedding failed: {e}")
 

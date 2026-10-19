@@ -215,6 +215,29 @@ def test_embed_table_mismatched_column_counts_raises(people, fake_embedding):
         db.embed_table(people, "people", ["name", "city"], ["vector"])
 
 
+def test_embed_table_target_colliding_with_later_source_does_not_corrupt_it(people, monkeypatch):
+    # Regression test: when an earlier pair's target column name equals a later pair's
+    # source column name, the later pair must still embed the ORIGINAL text — not the
+    # vector that was just written into that column by the earlier pair.
+    calls = []
+
+    class RecordingEmbed:
+        def generate_embeddings(self, texts):
+            calls.append(list(texts))
+            return [[float(len(t)), 0.0] for t in texts]
+
+    monkeypatch.setattr(db, "get_embedding_function", lambda name: RecordingEmbed())
+
+    original_names = sorted(db.query_table(people, "people", limit=1000)["name"].tolist())
+
+    db.embed_table(people, "people", ["city", "name"], ["name", "final"], overwrite=True)
+
+    assert len(calls) == 2
+    second_call_texts = sorted(calls[1])
+    assert second_call_texts == original_names
+    assert not any(text.startswith("[") for text in second_call_texts)
+
+
 def test_get_embedding_function_wraps_backend_errors(monkeypatch):
     import lancedb.embeddings
 
@@ -226,3 +249,38 @@ def test_get_embedding_function_wraps_backend_errors(monkeypatch):
     with pytest.raises(CommandError, match="Could not load embedding model"):
         db.get_embedding_function("some/model")
     db.get_embedding_function.cache_clear()
+
+
+def test_get_embedding_function_disables_tqdm_multiprocessing_lock(monkeypatch):
+    # Regression test: loading a real model triggers a tqdm progress bar
+    # ("Loading weights"), whose TqdmDefaultWriteLock.create_mp_lock() calls
+    # multiprocessing.RLock() to coordinate output across forked processes. Inside a
+    # running Textual app (raw-mode pty, unusual fd layout), registering that lock
+    # spawns Python's resource_tracker subprocess, which can fail with
+    # "ValueError: bad value(s) in fds_to_keep" — crashing /embedding entirely, even
+    # though we never fork our own child processes and have no use for a
+    # multiprocessing-safe tqdm lock in the first place. Pre-setting mp_lock skips
+    # multiprocessing.RLock() construction entirely (create_mp_lock no-ops once the
+    # class attribute already exists).
+    import lancedb.embeddings
+    import tqdm.std
+
+    if hasattr(tqdm.std.TqdmDefaultWriteLock, "mp_lock"):
+        monkeypatch.delattr(tqdm.std.TqdmDefaultWriteLock, "mp_lock")
+
+    class _FakeEmbed:
+        def generate_embeddings(self, texts):
+            return [[0.0] for _ in texts]
+
+    monkeypatch.setattr(
+        lancedb.embeddings,
+        "get_registry",
+        lambda: type(
+            "Registry", (), {"get": lambda self, name: type("Fn", (), {"create": lambda self, **kw: _FakeEmbed()})()}
+        )(),
+    )
+    db.get_embedding_function.cache_clear()
+    db.get_embedding_function("some/model")
+    db.get_embedding_function.cache_clear()
+
+    assert tqdm.std.TqdmDefaultWriteLock.mp_lock is None

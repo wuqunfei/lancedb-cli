@@ -169,6 +169,15 @@ def test_embedding_is_destructive_and_confirm_message_names_table(state, fake_em
     assert "people" in prepared.confirm_message
 
 
+def test_embedding_confirm_message_never_shows_none_for_omitted_target(state, fake_embedding):
+    # Regression test: --target is omitted here, so args.target is None. The confirm
+    # message must not literally say "None" — it can't yet know the resolved default
+    # ("vector"), since that's computed by parse_embedding_columns inside the handler,
+    # after confirmation — so it must not promise a target name it can't back up.
+    prepared = registry.prepare(state, "/embedding --table people --source name")
+    assert "None" not in prepared.confirm_message
+
+
 def test_embedding_uses_explicit_model_flag(state, fake_embedding):
     run(state, "/embedding --table people --source name --model org/explicit-model")
     assert fake_embedding == ["org/explicit-model"]
