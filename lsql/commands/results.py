@@ -60,3 +60,4 @@ class PreparedCommand:
     name: str
     run: Any  # zero-arg callable returning a CommandResult
     confirm_message: Optional[str] = None
+    slow: bool = False  # True if run() may take long enough to need a progress indicator

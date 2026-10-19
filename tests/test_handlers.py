@@ -162,6 +162,17 @@ def test_embedding_does_not_require_current_table(state, fake_embedding):
     assert "vector" in db.get_schema(state.connection, "people").names
 
 
+def test_embedding_is_marked_slow(state, fake_embedding):
+    prepared = registry.prepare(state, "/embedding --table people --source name")
+    assert isinstance(prepared, PreparedCommand)
+    assert prepared.slow is True
+
+
+def test_drop_is_not_marked_slow(state):
+    prepared = registry.prepare(state, "/drop")
+    assert prepared.slow is False
+
+
 def test_embedding_is_destructive_and_confirm_message_names_table(state, fake_embedding):
     prepared = registry.prepare(state, "/embedding --table people --source name")
     assert isinstance(prepared, PreparedCommand)

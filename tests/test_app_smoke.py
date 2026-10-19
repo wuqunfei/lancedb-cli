@@ -455,6 +455,130 @@ async def test_embedding_model_panel_set_button_posts_model_selected(monkeypatch
     assert app.selected == "org/panel-model"
 
 
+async def test_confirm_progress_modal_yes_disables_buttons_shows_spinner_then_dismisses():
+    import threading
+
+    from textual import work
+    from textual.app import App
+    from textual.widgets import Button, LoadingIndicator
+
+    from lsql.commands.results import ok_text
+    from lsql.tui.widgets.confirm_progress_modal import ConfirmProgressModal
+
+    release = threading.Event()
+    calls = {"count": 0}
+
+    def slow_run():
+        calls["count"] += 1
+        release.wait(timeout=5)
+        return ok_text("done")
+
+    class ModalHostApp(App):
+        CSS_PATH = APP_TCSS
+        result = "unset"
+
+        @work
+        async def on_mount(self) -> None:
+            self.result = await self.push_screen_wait(ConfirmProgressModal("Really?", slow_run))
+
+    app = ModalHostApp()
+    try:
+        async with app.run_test() as pilot:
+            await _wait_until(lambda: app.screen.query("#confirm-progress-yes"), pilot)
+            assert app.screen.query_one("#confirm-progress-spinner", LoadingIndicator).display is False
+
+            await pilot.click("#confirm-progress-yes")
+            await _wait_until(lambda: calls["count"] == 1, pilot)
+            assert app.screen.query_one("#confirm-progress-yes", Button).disabled is True
+            assert app.screen.query_one("#confirm-progress-no", Button).disabled is True
+            assert app.screen.query_one("#confirm-progress-spinner", LoadingIndicator).display is True
+
+            release.set()
+            await _wait_until(lambda: app.result != "unset", pilot)
+        assert app.result.kind == "text"
+        assert calls["count"] == 1
+    finally:
+        release.set()
+
+
+async def test_confirm_progress_modal_no_dismisses_without_running():
+    from textual import work
+    from textual.app import App
+
+    from lsql.tui.widgets.confirm_progress_modal import ConfirmProgressModal
+
+    calls = {"count": 0}
+
+    def run():
+        calls["count"] += 1
+        from lsql.commands.results import ok_text
+
+        return ok_text("should not run")
+
+    class ModalHostApp(App):
+        CSS_PATH = APP_TCSS
+        result = "unset"
+
+        @work
+        async def on_mount(self) -> None:
+            self.result = await self.push_screen_wait(ConfirmProgressModal("Really?", run))
+
+    app = ModalHostApp()
+    async with app.run_test() as pilot:
+        await _wait_until(lambda: app.screen.query("#confirm-progress-no"), pilot)
+        await pilot.click("#confirm-progress-no")
+        await _wait_until(lambda: app.result != "unset", pilot)
+    assert app.result.kind == "cancelled"
+    assert calls["count"] == 0
+
+
+async def test_embedding_command_shows_progress_modal_and_updates_results(tmp_path, monkeypatch):
+    import threading
+
+    release = threading.Event()
+
+    class _FakeEmbed:
+        def generate_embeddings(self, texts):
+            return [[0.0] for _ in texts]
+
+    def blocking_get(name):
+        release.wait(timeout=5)
+        return _FakeEmbed()
+
+    monkeypatch.setattr(db, "get_embedding_function", blocking_get)
+
+    from textual.widgets import Button
+
+    conn = db.connect(str(tmp_path / "mydb.lance"))
+    db.load_csv(conn, str(SAMPLE_CSV), "people")
+
+    app = make_app(tmp_path, initial_db_path=str(tmp_path / "mydb.lance"))
+    try:
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await type_and_submit(
+                pilot, "#command-input", "/embedding --table people --source name"
+            )
+            await _wait_until(lambda: app.screen.query("#confirm-progress-yes"), pilot)
+
+            await pilot.click("#confirm-progress-yes")
+            await _wait_until(
+                lambda: app.screen.query("#confirm-progress-yes")
+                and app.screen.query_one("#confirm-progress-yes", Button).disabled,
+                pilot,
+            )
+
+            release.set()
+            await _wait_until(lambda: not app.screen.query("#confirm-progress-dialog"), pilot)
+            await pilot.pause()
+
+            text = str(app.query_one("#results-static").render())
+            assert "Computed embeddings" in text
+            assert "vector" in db.get_schema(conn, "people").names
+    finally:
+        release.set()
+
+
 async def test_selecting_table_sets_current_table(tmp_path, db_with_table):
     app = make_app(tmp_path, initial_db_path=db_with_table)
     async with app.run_test() as pilot:

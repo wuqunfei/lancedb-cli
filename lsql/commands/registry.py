@@ -24,6 +24,7 @@ class CommandSpec:
     destructive: bool = False
     confirm_template: Optional[str] = None
     raw_text: bool = False
+    slow: bool = False  # True if the handler may take long enough to need a progress indicator
     help_text: str = ""  # one-line summary, shown by /help and the command-input suggestions
 
 
@@ -128,6 +129,7 @@ COMMANDS = {
             "Compute embeddings for table '{table}' from column(s) '{source}'? "
             "This rewrites the entire table."
         ),
+        slow=True,
         help_text="Compute embeddings for a table (--table/--source/--target/--model/--overwrite)",
     ),
     "dump": CommandSpec(
@@ -190,7 +192,9 @@ def prepare(state: AppState, line: str) -> Optional[Union[CommandResult, Prepare
         fmt_kwargs.update(vars(args))
         confirm_message = spec.confirm_template.format(**fmt_kwargs)
 
-    return PreparedCommand(name=spec.name, run=lambda: spec.handler(state, args), confirm_message=confirm_message)
+    return PreparedCommand(
+        name=spec.name, run=lambda: spec.handler(state, args), confirm_message=confirm_message, slow=spec.slow
+    )
 
 
 def execute(prepared: PreparedCommand) -> CommandResult:

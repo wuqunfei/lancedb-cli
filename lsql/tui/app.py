@@ -17,6 +17,7 @@ from ..core.parsing import convert_value
 from ..core.system_theme import system_prefers_dark
 from .widgets.command_input_panel import CommandInputPanel
 from .widgets.confirm_modal import ConfirmModal
+from .widgets.confirm_progress_modal import ConfirmProgressModal
 from .widgets.database_panel import DatabasePanel
 from .widgets.embedding_model_panel import EmbeddingModelPanel
 from .widgets.results_panel import ResultsPanel
@@ -146,6 +147,12 @@ class LanceDBApp(App):
             return
 
         if prepared.confirm_message:
+            if prepared.slow:
+                result = await self.push_screen_wait(
+                    ConfirmProgressModal(prepared.confirm_message, lambda: registry.execute(prepared))
+                )
+                self._show_result(result)
+                return
             confirmed = await self.push_screen_wait(ConfirmModal(prepared.confirm_message))
             if not confirmed:
                 self.query_one(ResultsPanel).show_result(cmdresults.cancelled())
