@@ -94,6 +94,32 @@ def cmd_embedding(state: AppState, args: argparse.Namespace) -> r.CommandResult:
     )
 
 
+def cmd_index(state: AppState, args: argparse.Namespace) -> r.CommandResult:
+    db.create_fts_index(state.connection, state.current_table, args.column)
+    return r.ok_text(
+        rendering.format_status(f"Built full-text index on '{args.column}' for '{state.current_table}'")
+    )
+
+
+def cmd_search(state: AppState, args: argparse.Namespace) -> r.CommandResult:
+    model_name = args.model or state.current_embedding_model or db.DEFAULT_EMBEDDING_MODEL
+    df = db.search_table(
+        state.connection,
+        state.current_table,
+        mode=args.mode,
+        query=args.query,
+        vector_column=args.vector_column,
+        text_column=args.text_column,
+        model_name=model_name,
+        limit=args.limit,
+        where=args.where,
+        select=args.select,
+    )
+    if len(df) == 0:
+        return r.ok_text(rendering.format_status("No results", style="red"))
+    return r.ok_dataframe(df, title=f"Search results from '{state.current_table}' ({args.mode})")
+
+
 def cmd_dump(state: AppState, args: argparse.Namespace) -> r.CommandResult:
     df = db.dump_csv(state.connection, state.current_table, args.path, overwrite=args.overwrite)
     return r.ok_text(rendering.format_status(f"Dumped {len(df)} row(s) from '{state.current_table}' to '{args.path}'"))

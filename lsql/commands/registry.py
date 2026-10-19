@@ -132,6 +132,21 @@ COMMANDS = {
         slow=True,
         help_text="Compute embeddings for a table (--table/--source/--target/--model/--overwrite)",
     ),
+    "index": CommandSpec(
+        "index",
+        handlers.cmd_index,
+        parser.build_index_parser,
+        help_text="Build a full-text index on a column of the current table (--column)",
+    ),
+    "search": CommandSpec(
+        "search",
+        handlers.cmd_search,
+        parser.build_search_parser,
+        help_text=(
+            "Search the current table (--mode vector|fts|hybrid --query ... "
+            "[--vector-column/--text-column/--model/--limit/--where/--select])"
+        ),
+    ),
     "dump": CommandSpec(
         "dump",
         handlers.cmd_dump,

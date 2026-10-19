@@ -211,3 +211,65 @@ def test_embedding_multi_column(state, fake_embedding):
     names = db.get_schema(state.connection, "people").names
     assert "name_vector" in names
     assert "city_vector" in names
+
+
+def test_index_builds_fts_index_on_current_table(state):
+    result = run(state, "/index --column city")
+    assert result.kind == "text"
+    tbl = db.open_table(state.connection, "people")
+    assert db.has_fts_index(tbl, "city") is True
+
+
+def test_index_requires_current_table(state):
+    state.current_table = None
+    result = registry.prepare(state, "/index --column city")
+    assert result.kind == "error"
+    assert "No table selected" in str(result.renderable)
+
+
+def test_index_missing_column_is_an_error_not_a_crash(state):
+    result = run(state, "/index --column nope")
+    assert result.kind == "error"
+
+
+def test_search_vector_mode_returns_dataframe(state, fake_embedding):
+    run(state, "/embedding --table people --source name")
+    result = run(state, "/search --mode vector --query hello")
+    assert result.kind == "dataframe"
+    assert len(result.dataframe) > 0
+
+
+def test_search_fts_mode_auto_creates_index_and_returns_dataframe(state):
+    result = run(state, "/search --mode fts --query 'New York' --text-column city")
+    assert result.kind == "dataframe"
+    tbl = db.open_table(state.connection, "people")
+    assert db.has_fts_index(tbl, "city") is True
+
+
+def test_search_hybrid_mode_returns_dataframe(state, fake_embedding):
+    run(state, "/embedding --table people --source name")
+    result = run(state, "/search --mode hybrid --query 'New York' --text-column city")
+    assert result.kind == "dataframe"
+
+
+def test_search_no_results_is_text_not_error(state, fake_embedding):
+    run(state, "/embedding --table people --source name")
+    result = run(state, "/search --mode fts --query zzzznotfound --text-column city")
+    assert result.kind == "text"
+
+
+def test_search_requires_current_table(state):
+    state.current_table = None
+    result = registry.prepare(state, "/search --mode vector --query hello")
+    assert result.kind == "error"
+
+
+def test_search_uses_explicit_model_flag(state, fake_embedding):
+    run(state, "/embedding --table people --source name")
+    run(state, "/search --mode vector --query hello --model org/explicit-model")
+    assert "org/explicit-model" in fake_embedding
+
+
+def test_search_bad_mode_is_an_error_not_a_crash(state):
+    result = registry.prepare(state, "/search --mode nope --query hello")
+    assert result.kind == "error"
