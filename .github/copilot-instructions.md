@@ -29,7 +29,7 @@ lsql/
   tui/
     app.py                       # LanceDBApp — the Textual App, holds AppState
     app.tcss                      # layout/styling
-    widgets/                       # one module per panel + ConfirmModal
+    widgets/                       # one module per panel + modals (confirm, directory-browser, cell-detail, embedding-model-download)
 ```
 
 ### Key rule: commands never touch a terminal directly
@@ -46,12 +46,13 @@ Commands that need a table (`query`, `schema`, `delete`, `empty`, `drop`, `updat
 `dump`) always use `AppState.current_table` — the table selected in the table list
 panel. They do **not** accept a table-name argument. `/sql` is the one exception: it
 runs across every table in the database and ignores `current_table` entirely. `/load`
-is the other exception: since it creates a new table, it takes an explicit `--table`
-flag.
+and `/embedding` are the other exceptions: both take an explicit `--table` flag —
+`/load` because it creates a new table, `/embedding` because it's often more convenient
+to target a table other than the one currently selected.
 
 ### Destructive commands
 
-`/drop`, `/empty`, `/delete` are marked `destructive=True` in the `COMMANDS` registry
+`/drop`, `/empty`, `/delete`, `/embedding` are marked `destructive=True` in the `COMMANDS` registry
 with a `confirm_template`. `registry.prepare()` builds the confirmation message but
 does **not** show it — that's the TUI's job: `tui/app.py` calls
 `push_screen_wait(ConfirmModal(...))` (inside a method decorated with `@work`, since
@@ -87,7 +88,7 @@ does **not** show it — that's the TUI's job: `tui/app.py` calls
 
 ## Dependencies
 
-**Core:** `lancedb`, `duckdb`, `pandas`, `typer`, `rich`, `textual`
+**Core:** `lancedb`, `duckdb`, `pandas`, `typer`, `rich`, `textual`, `sentence-transformers`
 **Dev:** pytest, pytest-asyncio (for Pilot tests), pytest-cov, black, isort, flake8, mypy
 
 ## Documentation

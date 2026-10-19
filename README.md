@@ -23,7 +23,9 @@ more retyping paths and table names for every single query.
 - 📄 **Pagination** — large result sets are paged 100 rows at a time instead of flooding
   the screen
 - 🧮 **Raw SQL via DuckDB** — `/sql` runs across every table in the database
-- 🛟 **Confirmation dialogs** — `/drop`, `/empty`, and `/delete` always ask first
+- 🧬 **Embeddings** — set a sentence-transformers model in the Embedding Model panel
+  (downloading it on first use), then `/embedding` computes vector column(s) for a table
+- 🛟 **Confirmation dialogs** — `/drop`, `/empty`, `/delete`, and `/embedding` always ask first
 - ⏪ **Command history** — up/down arrow recall, just like a shell
 - 📚 **Built-in help** — `/help` lists every command; `/help <command>` shows its flags
 - 🌓 **Light/dark theme** — a one-click toggle, defaulting to your OS's current setting
@@ -114,14 +116,23 @@ it there rather than naming it in the command.
 | `/empty` | Delete all rows from the current table |
 | `/drop` | Drop the current table entirely |
 | `/load --path file.csv --table name [--overwrite]` | Load a CSV into a new table |
+| `/embedding --table name --source col[,col2] [--target vec[,vec2]] [--model org/name] [--overwrite]` | Compute embeddings for one or more columns into vector column(s) |
 | `/dump --path out.csv [--overwrite]` | Dump the current table to CSV |
 | `/refresh` | Refresh the table list and SQL views |
 | `/help [command]` | Show all commands, or details for one |
 | `/exit` | Quit |
 
-`/drop`, `/empty`, and `/delete` pop a confirmation dialog before running. `/load`
-creates a brand-new table, so it takes an explicit `--table` name instead of using the
-current selection.
+`/drop`, `/empty`, `/delete`, and `/embedding` pop a confirmation dialog before running
+(`/embedding` always rewrites the whole table under the hood, even without
+`--overwrite`). `/load` and `/embedding` take an explicit `--table` name instead of
+using the current selection — `/load` because it creates a brand-new table,
+`/embedding` because it's often more convenient to target a table other than the one
+currently selected.
+
+`/embedding` uses the model set in the Embedding Model panel by default, or
+`all-MiniLM-L6-v2` if none has been set; `--model` overrides both for a single run.
+With multiple `--source` columns and no `--target`, each gets its own `<source>_vector`
+column.
 
 ---
 
