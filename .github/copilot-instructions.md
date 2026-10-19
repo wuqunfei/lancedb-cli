@@ -43,8 +43,9 @@ unit-testable without a running Textual app (see `tests/test_handlers.py`).
 ### Table targeting
 
 Commands that need a table (`query`, `schema`, `delete`, `empty`, `drop`, `update`,
-`dump`) always use `AppState.current_table` — the table selected in the table list
-panel. They do **not** accept a table-name argument. `/sql` is the one exception: it
+`dump`, `index`, `search`) always use `AppState.current_table` — the table selected in
+the table list panel. They do **not** accept a table-name argument. `/sql` is the one
+exception: it
 runs across every table in the database and ignores `current_table` entirely. `/load`
 and `/embedding` are the other exceptions: both take an explicit `--table` flag —
 `/load` because it creates a new table, `/embedding` because it's often more convenient
@@ -88,7 +89,7 @@ does **not** show it — that's the TUI's job: `tui/app.py` calls
 
 ## Dependencies
 
-**Core:** `lancedb`, `duckdb`, `pandas`, `typer`, `rich`, `textual`, `sentence-transformers`
+**Core:** `lancedb`, `duckdb`, `pandas`, `pyarrow`, `typer`, `rich`, `textual`, `sentence-transformers`
 **Dev:** pytest, pytest-asyncio (for Pilot tests), pytest-cov, black, isort, flake8, mypy
 
 ## Documentation

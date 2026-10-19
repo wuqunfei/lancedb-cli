@@ -29,6 +29,7 @@ def make_app(tmp_path: Path, initial_db_path: str = None) -> LanceDBApp:
         initial_db_path=initial_db_path,
         recent_databases=persistence.RecentDatabases(path=tmp_path / "recent.json"),
         command_history=persistence.CommandHistory(path=tmp_path / "history.json"),
+        last_embedding_model=persistence.LastEmbeddingModel(path=tmp_path / "last_model.json"),
     )
 
 
@@ -143,6 +144,53 @@ async def scenario_cell_detail(tmp_path: Path) -> None:
         await shot(app, pilot, "09-cell-detail")
 
 
+async def scenario_search(tmp_path: Path) -> None:
+    db_path = tmp_path / "notes.lance"
+    conn = db.connect(str(db_path))
+    notes = [
+        "Remember to water the plants every Tuesday",
+        "Quarterly report is due at the end of the month",
+        "Buy milk, eggs, and bread on the way home",
+        "Schedule a dentist appointment for next week",
+        "Review the pull request before lunch",
+    ]
+    conn.create_table("notes", data=pd.DataFrame({"note": notes}))
+
+    app = make_app(tmp_path, initial_db_path=str(db_path))
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.pause()
+        await force_dark_theme(app, pilot)
+        await pilot.click("#table-list ListItem")
+        await pilot.pause(0.2)
+
+        await pilot.click("#command-input")
+        inp = app.query_one("#command-input")
+        inp.value = ""
+        for ch in "/embedding --table notes --source note":
+            await pilot.press(ch)
+        await pilot.press("enter")
+        for _ in range(20):
+            if app.screen.query("#confirm-progress-yes"):
+                break
+            await pilot.pause(0.2)
+        await pilot.click("#confirm-progress-yes")
+        # Downloading the real default model (first run only) + embedding can take a
+        # while — poll for the progress modal to close rather than a fixed sleep.
+        for _ in range(600):
+            if not app.screen.query("#confirm-progress-dialog"):
+                break
+            await pilot.pause(0.5)
+        await pilot.pause(1.0)  # let the screen stack and results panel fully settle
+
+        await pilot.click("#command-input")
+        inp.value = ""
+        for ch in '/search --mode hybrid --query "remember to buy groceries" --text-column note':
+            await pilot.press(ch)
+        await pilot.press("enter")
+        await pilot.pause(0.5)
+        await shot(app, pilot, "10-search-results")
+
+
 async def main() -> None:
     SCREENSHOTS_DIR.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory() as tmp:
@@ -158,6 +206,7 @@ async def main() -> None:
 
         await scenario_pagination(tmp_path / "s4")
         await scenario_cell_detail(tmp_path / "s5")
+        await scenario_search(tmp_path / "s6")
 
 
 if __name__ == "__main__":
