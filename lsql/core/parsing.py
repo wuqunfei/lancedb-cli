@@ -1,6 +1,8 @@
 """Value/clause parsing helpers, used by command handlers."""
 
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional, Tuple
+
+from .exceptions import CommandError
 
 MAX_FIELD_LENGTH = 50
 
@@ -69,3 +71,26 @@ def parse_set_clause(set_clause: str) -> Dict[str, Any]:
         update_values[key] = convert_value(value)
 
     return update_values
+
+
+def parse_embedding_columns(source: str, target: Optional[str]) -> Tuple[List[str], List[str]]:
+    """Parse --source/--target into paired column-name lists (comma-separated). When
+    --target is omitted: 'vector' for a single source column, or '<source>_vector' per
+    column when there are multiple source columns."""
+    source_cols = [c.strip() for c in source.split(",") if c.strip()]
+    if not source_cols:
+        raise CommandError("--source must name at least one column")
+
+    if target:
+        target_cols = [c.strip() for c in target.split(",") if c.strip()]
+    elif len(source_cols) == 1:
+        target_cols = ["vector"]
+    else:
+        target_cols = [f"{c}_vector" for c in source_cols]
+
+    if len(source_cols) != len(target_cols):
+        raise CommandError(
+            f"--source has {len(source_cols)} column(s) but --target has {len(target_cols)} — "
+            "they must pair up one-to-one"
+        )
+    return source_cols, target_cols
