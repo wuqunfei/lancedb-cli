@@ -148,7 +148,7 @@ python scripts/generate_screenshots.py
 
 ### Requirements
 
-- Python 3.9+
+- Python 3.10+
 - lancedb, duckdb, pandas, typer, rich, textual
 
 ---
