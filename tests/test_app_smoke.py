@@ -14,6 +14,14 @@ from lsql.tui.widgets.table_list_panel import TableListPanel
 
 SAMPLE_CSV = Path(__file__).parent.parent / "test_data" / "sample.csv"
 
+# Standalone host apps below (for testing a single modal/widget in isolation) don't get
+# LanceDBApp's CSS_PATH for free, so without this they'd render with Textual's default
+# styling instead of app.tcss — which can overflow the test terminal in ways the real
+# app never would.
+import lsql.tui.app as _app_module  # noqa: E402
+
+APP_TCSS = str(Path(_app_module.__file__).parent / "app.tcss")
+
 
 async def type_and_submit(pilot, selector, text):
     """Click the input, clear any pre-filled text (e.g. the auto-query a table click
@@ -159,6 +167,150 @@ async def test_directory_browser_modal_open_returns_start_path(tmp_path, db_with
         await pilot.click("#browser-open")
         await pilot.pause()
     assert Path(app.result).resolve() == Path(db_with_table).resolve()
+
+
+async def _wait_until(condition, pilot, attempts=20):
+    """Poll `condition()` across event-loop pauses, since the download modal's
+    @work(thread=True) load crosses a real thread boundary — a single pilot.pause()
+    isn't guaranteed to observe the call_from_thread callback having landed yet."""
+    for _ in range(attempts):
+        if condition():
+            return True
+        await pilot.pause()
+    return condition()
+
+
+async def test_embedding_download_modal_success_dismisses_true(monkeypatch):
+    from textual import work
+    from textual.app import App
+
+    from lsql.core import db
+    from lsql.tui.widgets.embedding_model_download_modal import EmbeddingModelDownloadModal
+
+    monkeypatch.setattr(db, "get_embedding_function", lambda name: object())
+
+    class ModalHostApp(App):
+        CSS_PATH = APP_TCSS
+        result = "unset"
+
+        @work
+        async def on_mount(self) -> None:
+            self.result = await self.push_screen_wait(EmbeddingModelDownloadModal("org/model"))
+
+    app = ModalHostApp()
+    async with app.run_test() as pilot:
+        await _wait_until(lambda: app.result is not True, pilot)
+        await _wait_until(lambda: app.result is True, pilot)
+    assert app.result is True
+
+
+async def test_embedding_download_modal_cancel_dismisses_false(monkeypatch):
+    import threading
+
+    from textual import work
+    from textual.app import App
+
+    from lsql.core import db
+    from lsql.tui.widgets.embedding_model_download_modal import EmbeddingModelDownloadModal
+
+    # Blocks until the test is done with it, so the worker thread can never race ahead
+    # and dismiss(True) before the test gets a chance to click Cancel.
+    never_set = threading.Event()
+
+    def blocking_get(name):
+        never_set.wait(timeout=5)
+        return object()
+
+    monkeypatch.setattr(db, "get_embedding_function", blocking_get)
+
+    class ModalHostApp(App):
+        CSS_PATH = APP_TCSS
+        result = "unset"
+
+        @work
+        async def on_mount(self) -> None:
+            self.result = await self.push_screen_wait(EmbeddingModelDownloadModal("org/model"))
+
+    app = ModalHostApp()
+    try:
+        async with app.run_test() as pilot:
+            await _wait_until(lambda: app.screen.query("#embedding-modal-cancel"), pilot)
+            await pilot.pause()
+            await pilot.click("#embedding-modal-cancel")
+            await _wait_until(lambda: app.result is False, pilot)
+        assert app.result is False
+    finally:
+        never_set.set()  # let the blocked worker thread return instead of waiting out its timeout
+
+
+async def test_embedding_download_modal_failure_shows_retry_then_succeeds(monkeypatch):
+    from textual import work
+    from textual.app import App
+    from textual.widgets import Button, Label, LoadingIndicator
+
+    from lsql.core import db
+    from lsql.core.exceptions import CommandError
+    from lsql.tui.widgets.embedding_model_download_modal import EmbeddingModelDownloadModal
+
+    attempts = {"count": 0}
+
+    def flaky_get(name):
+        attempts["count"] += 1
+        if attempts["count"] == 1:
+            raise CommandError("network down")
+        return object()
+
+    monkeypatch.setattr(db, "get_embedding_function", flaky_get)
+
+    class ModalHostApp(App):
+        CSS_PATH = APP_TCSS
+        result = "unset"
+
+        @work
+        async def on_mount(self) -> None:
+            self.result = await self.push_screen_wait(EmbeddingModelDownloadModal("org/model"))
+
+    def retry_enabled():
+        buttons = app.screen.query("#embedding-modal-retry")
+        return bool(buttons) and not buttons.first(Button).disabled
+
+    app = ModalHostApp()
+    async with app.run_test() as pilot:
+        await _wait_until(retry_enabled, pilot)
+        assert "Failed" in str(app.screen.query_one("#embedding-modal-status", Label).render())
+        assert app.screen.query_one("#embedding-modal-spinner", LoadingIndicator).display is False
+
+        await pilot.click("#embedding-modal-retry")
+        await _wait_until(lambda: app.result is True, pilot)
+    assert app.result is True
+    assert attempts["count"] == 2
+
+
+async def test_embedding_model_panel_set_button_posts_model_selected(monkeypatch):
+    from textual import work
+    from textual.app import App
+
+    from lsql.core import db
+    from lsql.tui.widgets.embedding_model_panel import EmbeddingModelPanel
+
+    monkeypatch.setattr(db, "get_embedding_function", lambda name: object())
+
+    class PanelHostApp(App):
+        CSS_PATH = APP_TCSS
+        selected = None
+
+        def compose(self):
+            yield EmbeddingModelPanel(id="embedding-model-panel")
+
+        def on_embedding_model_panel_model_selected(self, event):
+            self.selected = event.name
+
+    app = PanelHostApp()
+    async with app.run_test() as pilot:
+        app.query_one("#embedding-model-input").value = "org/panel-model"
+        await pilot.click("#set-embedding-button")
+        await _wait_until(lambda: app.selected is not None, pilot)
+    assert app.selected == "org/panel-model"
 
 
 async def test_selecting_table_sets_current_table(tmp_path, db_with_table):

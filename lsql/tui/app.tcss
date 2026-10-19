@@ -57,6 +57,69 @@ DatabasePanel {
     text-style: none;
 }
 
+EmbeddingModelPanel {
+    height: auto;
+    border: round $primary;
+    padding: 0 1;
+}
+
+#embedding-model-input {
+    margin-top: 0;
+}
+
+#embedding-panel-actions {
+    height: 1;
+    margin-top: 1;
+}
+
+#set-embedding-button {
+    height: 1;
+    min-width: 0;
+    border: none;
+    padding: 0 1;
+}
+
+EmbeddingModelDownloadModal {
+    align: center middle;
+}
+
+#embedding-modal-dialog {
+    width: 60;
+    height: auto;
+    padding: 1 2;
+    border: thick $primary;
+    background: $surface;
+}
+
+#embedding-modal-title {
+    height: 1;
+    text-style: bold;
+}
+
+#embedding-modal-spinner {
+    height: 3;
+}
+
+#embedding-modal-status {
+    height: auto;
+    color: $text-muted;
+    margin-top: 1;
+}
+
+#embedding-modal-buttons {
+    height: 1;
+    margin-top: 1;
+    align: right middle;
+}
+
+#embedding-modal-retry, #embedding-modal-cancel {
+    height: 1;
+    min-width: 0;
+    border: none;
+    padding: 0 1;
+    margin-left: 2;
+}
+
 TableListPanel {
     height: 1fr;
     border: round $primary;
