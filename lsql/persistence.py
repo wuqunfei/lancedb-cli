@@ -54,6 +54,21 @@ class RecentDatabases:
         return items
 
 
+class LastEmbeddingModel:
+    """The most recently 'Set' embedding model name, if any — stored as a 1-item list
+    via the same _load_list/_save_list helpers RecentDatabases/CommandHistory use."""
+
+    def __init__(self, path: Optional[Path] = None):
+        self.path = path or (default_config_dir() / "last_embedding_model.json")
+
+    def load(self) -> Optional[str]:
+        items = _load_list(self.path)
+        return items[0] if items else None
+
+    def set(self, model_name: str) -> None:
+        _save_list(self.path, [model_name])
+
+
 class CommandHistory:
     """Submitted command-input lines, oldest first, capped to the most recent N."""
 

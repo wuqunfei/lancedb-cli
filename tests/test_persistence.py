@@ -1,6 +1,6 @@
 from unittest.mock import patch
 
-from lsql.persistence import CommandHistory, RecentDatabases, default_config_dir
+from lsql.persistence import CommandHistory, LastEmbeddingModel, RecentDatabases, default_config_dir
 
 
 def test_default_config_dir_migrates_old_directory(tmp_path):
@@ -122,3 +122,27 @@ def test_load_ignores_corrupt_file(tmp_path):
     path = tmp_path / "recent.json"
     path.write_text("not json")
     assert RecentDatabases(path=path).load() == []
+
+
+def test_last_embedding_model_empty_by_default(tmp_path):
+    lem = LastEmbeddingModel(path=tmp_path / "last_model.json")
+    assert lem.load() is None
+
+
+def test_last_embedding_model_set_then_load(tmp_path):
+    lem = LastEmbeddingModel(path=tmp_path / "last_model.json")
+    lem.set("org/model-a")
+    assert lem.load() == "org/model-a"
+
+
+def test_last_embedding_model_set_overwrites_previous(tmp_path):
+    lem = LastEmbeddingModel(path=tmp_path / "last_model.json")
+    lem.set("org/model-a")
+    lem.set("org/model-b")
+    assert lem.load() == "org/model-b"
+
+
+def test_last_embedding_model_persists_across_instances(tmp_path):
+    path = tmp_path / "last_model.json"
+    LastEmbeddingModel(path=path).set("org/model-a")
+    assert LastEmbeddingModel(path=path).load() == "org/model-a"
