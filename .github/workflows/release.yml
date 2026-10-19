@@ -1,62 +1,66 @@
 name: Release
 
+# Publishes lsql to PyPI via Trusted Publishing (OIDC, no API token).
+# PyPI pending publisher must match exactly:
+#   PyPI project name: lsql
+#   Owner:             wuqunfei
+#   Repository:        lsql
+#   Workflow filename: release.yml
+#   Environment:       pypi
+#
+# Trigger: push a tag like v0.1.0
+#   git tag v0.1.0 && git push origin v0.1.0
+
 on:
   push:
     tags:
-      - 'v*'  # Trigger on version tags like v0.1.0
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   build:
+    name: Build sdist and wheel
     runs-on: ubuntu-latest
-
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.12'
+      - uses: astral-sh/setup-uv@v6
 
-    - name: Install build dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install build twine
+      - name: Build
+        run: uv build
 
-    - name: Build distribution
-      run: python -m build
+      - name: Smoke-test the wheel
+        run: |
+          uv run --isolated --no-project --with dist/*.whl lsql --help > /dev/null && echo "✓ lsql --help works from installed wheel"
+          uv run --isolated --no-project --with dist/*.whl python -c "import lsql, pathlib; css = pathlib.Path(lsql.__file__).parent / 'tui' / 'app.tcss'; assert css.exists(), f'{css} missing from installed wheel'; print('✓ tui/app.tcss packaged correctly')"
 
-    - name: Check package with twine
-      run: twine check dist/*
-
-    - name: Smoke-test the built wheel in a fresh venv
-      run: |
-        python -m venv /tmp/wheel-check
-        /tmp/wheel-check/bin/pip install --upgrade pip
-        /tmp/wheel-check/bin/pip install dist/*.whl
-        /tmp/wheel-check/bin/lsql --help > /dev/null && echo "✓ lsql --help works from installed wheel"
-        /tmp/wheel-check/bin/python -c "import lsql, pathlib; css = pathlib.Path(lsql.__file__).parent / 'tui' / 'app.tcss'; assert css.exists(), f'{css} missing from installed wheel'; print('✓ tui/app.tcss packaged correctly')"
-
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: python-packages
-        path: dist/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
 
   publish:
+    name: Publish to PyPI
     needs: build
     runs-on: ubuntu-latest
-    environment: pypi
+    environment:
+      name: pypi
+      url: https://pypi.org/project/lsql/
     permissions:
-      id-token: write  # required for PyPI trusted publishing (OIDC) — no API token needed
-
+      id-token: write   # required for OIDC trusted publishing
+      contents: read
     steps:
-    - name: Download artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: python-packages
-        path: dist/
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
 
-    - name: Publish to PyPI
-      uses: pypa/gh-action-pypi-publish@release/v1
-      with:
-        skip-existing: true
+      # pypa/gh-action-pypi-publish does the OIDC exchange and also
+      # uploads PEP 740 attestations (uv publish does not yet).
+      - uses: pypa/gh-action-pypi-publish@release/v1
