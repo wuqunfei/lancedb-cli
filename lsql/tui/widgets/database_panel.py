@@ -46,10 +46,12 @@ class DatabasePanel(Vertical):
         path = event.value.strip()
         if path:
             self.post_message(self.DatabaseSelected(path))
-            event.input.value = ""
 
     def set_theme_icon(self, is_dark: bool) -> None:
         self.query_one("#theme-toggle-button", Button).label = DARK_ICON if is_dark else LIGHT_ICON
+
+    def set_path(self, path: str) -> None:
+        self.query_one("#db-path-input", Input).value = path
 
     @work
     async def on_button_pressed(self, event: Button.Pressed) -> None:

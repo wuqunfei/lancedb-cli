@@ -161,6 +161,7 @@ class LanceDBApp(App):
         self.recent_dbs.add(path)
         self.query_one(ResultsPanel).clear()
         self.query_one(CommandInputPanel).set_status(path, None)
+        self.query_one(DatabasePanel).set_path(path)
         self._refresh_table_list()
         return True
 

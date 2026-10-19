@@ -116,6 +116,28 @@ async def test_open_button_opens_and_cancel_closes_modal(tmp_path):
         assert app.state.current_db_path is None
 
 
+async def test_submitting_typed_path_keeps_path_in_input(tmp_path, db_with_table):
+    app = make_app(tmp_path)
+    async with app.run_test() as pilot:
+        await type_and_submit(pilot, "#db-path-input", db_with_table)
+        assert app.state.current_db_path == db_with_table
+        assert app.query_one("#db-path-input").value == db_with_table
+
+
+async def test_opening_via_folder_browser_fills_in_input(tmp_path, db_with_table):
+    app = make_app(tmp_path)
+    async with app.run_test() as pilot:
+        # Pre-fill the path so the browser opens with db_with_table pre-selected,
+        # then "Open" on the modal confirms that same path without navigating.
+        app.query_one("#db-path-input").value = db_with_table
+        await pilot.click("#open-db-button")
+        await pilot.pause()
+        await pilot.click("#browser-open")
+        await pilot.pause()
+        assert app.state.current_db_path == db_with_table
+        assert app.query_one("#db-path-input").value == db_with_table
+
+
 async def test_directory_browser_modal_open_returns_start_path(tmp_path, db_with_table):
     from textual.app import App
 
