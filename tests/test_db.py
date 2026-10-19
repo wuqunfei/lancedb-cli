@@ -163,3 +163,66 @@ def test_build_row_where_clause_handles_numpy_scalars_from_a_real_dataframe(peop
     db.update_rows(people, "people", {"name": "Updated Name"}, clause)
     result = db.query_table(people, "people", where="id = 1")
     assert result["name"].iloc[0] == "Updated Name"
+
+
+class _FakeEmbeddingFunction:
+    """Deterministic 4-dim stand-in for a real sentence-transformers model, so these
+    tests never hit the network or download hundreds of MB of torch weights."""
+
+    def generate_embeddings(self, texts):
+        return [[float(len(t)), 0.0, 0.0, 0.0] for t in texts]
+
+
+@pytest.fixture
+def fake_embedding(monkeypatch):
+    monkeypatch.setattr(db, "get_embedding_function", lambda name: _FakeEmbeddingFunction())
+
+
+def test_embed_table_single_column_defaults_name(people, fake_embedding):
+    df = db.embed_table(people, "people", ["name"], ["vector"])
+    assert "vector" in df.columns
+    assert len(df["vector"].iloc[0]) == 4
+
+    schema_names = db.get_schema(people, "people").names
+    assert "vector" in schema_names
+
+
+def test_embed_table_multi_column_writes_both_targets(people, fake_embedding):
+    df = db.embed_table(people, "people", ["name", "city"], ["name_vector", "city_vector"])
+    assert "name_vector" in df.columns
+    assert "city_vector" in df.columns
+
+
+def test_embed_table_missing_source_column_raises(people, fake_embedding):
+    with pytest.raises(CommandError, match="not found"):
+        db.embed_table(people, "people", ["nope"], ["vector"])
+
+
+def test_embed_table_existing_target_without_overwrite_raises(people, fake_embedding):
+    db.embed_table(people, "people", ["name"], ["vector"])
+    with pytest.raises(CommandError, match="already exist"):
+        db.embed_table(people, "people", ["city"], ["vector"])
+
+
+def test_embed_table_existing_target_with_overwrite_replaces(people, fake_embedding):
+    db.embed_table(people, "people", ["name"], ["vector"])
+    df = db.embed_table(people, "people", ["city"], ["vector"], overwrite=True)
+    assert "vector" in df.columns
+
+
+def test_embed_table_mismatched_column_counts_raises(people, fake_embedding):
+    with pytest.raises(CommandError, match="must pair up one-to-one"):
+        db.embed_table(people, "people", ["name", "city"], ["vector"])
+
+
+def test_get_embedding_function_wraps_backend_errors(monkeypatch):
+    import lancedb.embeddings
+
+    def boom():
+        raise RuntimeError("network down")
+
+    monkeypatch.setattr(lancedb.embeddings, "get_registry", boom)
+    db.get_embedding_function.cache_clear()
+    with pytest.raises(CommandError, match="Could not load embedding model"):
+        db.get_embedding_function("some/model")
+    db.get_embedding_function.cache_clear()

@@ -1,13 +1,17 @@
 """lancedb/duckdb access layer. Raises CommandError on user-facing failures."""
 
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import duckdb
 import lancedb
+import numpy as np
 import pandas as pd
 
 from .exceptions import CommandError
+
+DEFAULT_EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 
 
 def connect(db_path: str) -> lancedb.DBConnection:
@@ -218,4 +222,74 @@ def dump_csv(conn: lancedb.DBConnection, table_name: str, output_path: str, over
         df.to_csv(out_path, index=False)
     except Exception as e:
         raise CommandError(f"Dump failed: {e}")
+    return df
+
+
+@lru_cache(maxsize=4)
+def get_embedding_function(model_name: str):
+    """Load (and cache for the process lifetime) a sentence-transformers embedding
+    function by name. The .create() call is what triggers huggingface_hub's download
+    + local cache on first use of a given model — no custom downloader needed."""
+    try:
+        from lancedb.embeddings import get_registry
+
+        return get_registry().get("sentence-transformers").create(name=model_name)
+    except Exception as e:
+        raise CommandError(f"Could not load embedding model '{model_name}': {e}")
+
+
+def embed_table(
+    conn: lancedb.DBConnection,
+    table_name: str,
+    source_columns: List[str],
+    target_columns: List[str],
+    model_name: str = DEFAULT_EMBEDDING_MODEL,
+    overwrite: bool = False,
+) -> pd.DataFrame:
+    """Compute embeddings for one or more text columns into one or more vector columns.
+
+    Local/OSS LanceDB's Table.add_columns(transforms=...) only accepts SQL expressions
+    or Cloud/Enterprise-only Python function-columns — there is no schema-evolution API
+    to attach a Python embedding call for a local database. So: read the whole table
+    into a DataFrame, compute embeddings in Python, assign them as new column(s), and
+    rewrite the table via create_table(..., mode="overwrite"). Same whole-table-in-memory
+    ceiling as /dump and /sql (see build_row_where_clause)."""
+    if len(source_columns) != len(target_columns):
+        raise CommandError(
+            f"Got {len(source_columns)} source column(s) but {len(target_columns)} target "
+            "column(s) — they must pair up one-to-one"
+        )
+
+    tbl = open_table(conn, table_name)
+    schema_names = set(tbl.schema.names)
+    for col in source_columns:
+        if col not in schema_names:
+            raise CommandError(f"Source column '{col}' not found in table '{table_name}'")
+
+    existing_targets = [c for c in target_columns if c in schema_names]
+    if existing_targets and not overwrite:
+        raise CommandError(
+            f"Target column(s) {', '.join(existing_targets)} already exist in '{table_name}'. "
+            "Use --overwrite to replace them"
+        )
+
+    embed_fn = get_embedding_function(model_name)
+    df = tbl.to_pandas()
+
+    try:
+        for source_col, target_col in zip(source_columns, target_columns):
+            texts = df[source_col].fillna("").astype(str).tolist()
+            embeddings = embed_fn.generate_embeddings(texts)
+            # One np.ndarray per row (not a nested python list) — needed so lancedb's
+            # pandas->arrow conversion infers FixedSizeList<float32>, not a variable-
+            # length List, which is required for vector search to work on the result.
+            df[target_col] = list(np.asarray(embeddings, dtype=np.float32))
+    except Exception as e:
+        raise CommandError(f"Embedding failed: {e}")
+
+    try:
+        conn.create_table(table_name, data=df, mode="overwrite")
+    except Exception as e:
+        raise CommandError(f"Writing embedded table failed: {e}")
+
     return df
