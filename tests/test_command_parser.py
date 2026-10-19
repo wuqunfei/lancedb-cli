@@ -1,6 +1,6 @@
 import pytest
 
-from lancedbx.commands.parser import (
+from lsql.commands.parser import (
     ArgParseExit,
     build_delete_parser,
     build_load_parser,

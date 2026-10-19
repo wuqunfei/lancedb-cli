@@ -14,9 +14,9 @@ from pathlib import Path
 
 import pandas as pd
 
-from lancedbx import persistence
-from lancedbx.core import db
-from lancedbx.tui.app import LanceDBApp
+from lsql import persistence
+from lsql.core import db
+from lsql.tui.app import LanceDBApp
 
 REPO_ROOT = Path(__file__).parent.parent
 SCREENSHOTS_DIR = REPO_ROOT / "docs" / "screenshots"
@@ -33,7 +33,7 @@ def make_app(tmp_path: Path, initial_db_path: str = None) -> LanceDBApp:
 
 
 async def force_dark_theme(app: LanceDBApp, pilot) -> None:
-    from lancedbx.tui.widgets.database_panel import DatabasePanel
+    from lsql.tui.widgets.database_panel import DatabasePanel
 
     app.theme = "textual-dark"
     app.query_one(DatabasePanel).set_theme_icon(True)
@@ -120,7 +120,7 @@ async def scenario_pagination(tmp_path: Path) -> None:
 
 
 async def scenario_cell_detail(tmp_path: Path) -> None:
-    from lancedbx.tui.widgets.results_panel import ResultsDataTable
+    from lsql.tui.widgets.results_panel import ResultsDataTable
 
     db_path = tmp_path / "longtext.lance"
     conn = db.connect(str(db_path))

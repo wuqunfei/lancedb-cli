@@ -3,7 +3,7 @@ requires = ["setuptools>=45", "wheel", "setuptools_scm[toml]>=6.2"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "lancedbx"
+name = "lsql"
 dynamic = ["version"]
 description = "A terminal GUI for browsing and managing LanceDB databases"
 readme = "README.md"
@@ -13,7 +13,7 @@ authors = [
     {name = "Qunfei Wu", email = "wu.qunfei@gmail.com"},
     {name = "Davide Dal Farra", email = "davide@codref.org"},
 ]
-keywords = ["lancedb", "lancedbx", "lsql", "cli", "database", "duckdb", "tui", "textual"]
+keywords = ["lancedb", "lsql", "cli", "database", "duckdb", "tui", "textual"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Environment :: Console",
@@ -50,22 +50,22 @@ dev = [
 ]
 
 [tool.setuptools.dynamic]
-version = {attr = "lancedbx.__version__"}
+version = {attr = "lsql.__version__"}
 
 [project.urls]
-Homepage = "https://github.com/wuqunfei/lancedb-cli"
-Documentation = "https://github.com/wuqunfei/lancedb-cli#readme"
-Repository = "https://github.com/wuqunfei/lancedb-cli.git"
-"Bug Tracker" = "https://github.com/wuqunfei/lancedb-cli/issues"
+Homepage = "https://github.com/wuqunfei/lsql"
+Documentation = "https://github.com/wuqunfei/lsql#readme"
+Repository = "https://github.com/wuqunfei/lsql.git"
+"Bug Tracker" = "https://github.com/wuqunfei/lsql/issues"
 
 [project.scripts]
-lsql = "lancedbx.__main__:main"
+lsql = "lsql.__main__:main"
 
 [tool.setuptools.packages.find]
-include = ["lancedbx*"]
+include = ["lsql*"]
 
 [tool.setuptools.package-data]
-lancedbx = ["tui/*.tcss"]
+lsql = ["tui/*.tcss"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

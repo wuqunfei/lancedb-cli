@@ -1,4 +1,4 @@
-# GitHub Copilot Instructions for lancedbx
+# GitHub Copilot Instructions for lsql
 
 ## Project Overview
 
@@ -13,14 +13,14 @@ is handled via DuckDB integration.
 ## Architecture
 
 ```
-lancedbx/
+lsql/
   __main__.py       # thin Typer launcher — parses an optional db_path, runs the Textual app
   core/
     parsing.py       # value/clause parsing helpers (pure functions, no I/O)
     rendering.py      # Rich renderable builders (no module-level Console)
     db.py             # all lancedb/duckdb access; raises CommandError on failure
     exceptions.py       # CommandError
-  persistence.py        # recent-database paths + command history, JSON under ~/.config/lancedbx/
+  persistence.py        # recent-database paths + command history, JSON under ~/.config/lsql/
   commands/
     parser.py            # SilentArgumentParser (raises instead of sys.exit), per-command argparse factories
     registry.py            # CommandSpec/COMMANDS, prepare()/execute() dispatcher
@@ -83,7 +83,7 @@ does **not** show it — that's the TUI's job: `tui/app.py` calls
 - `tests/test_app_smoke.py` — Textual `Pilot` tests (`app.run_test()`), headless
 - **Never construct `LanceDBApp()` in a test without injecting `recent_databases=`/
   `command_history=` pointed at `tmp_path`** — the defaults write to the user's real
-  `~/.config/lancedbx/`. See `make_app()` in `tests/test_app_smoke.py`.
+  `~/.config/lsql/`. See `make_app()` in `tests/test_app_smoke.py`.
 
 ## Dependencies
 

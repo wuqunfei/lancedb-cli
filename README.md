@@ -1,7 +1,7 @@
-# 🗄️ lancedbx
+# 🗄️ lsql
 
-**lancedbx** is a terminal GUI for browsing and managing [LanceDB](https://lancedb.com/)
-databases — launched with the `lsql` command. Pick a database and a table visually,
+**lsql** is a terminal GUI for browsing and managing [LanceDB](https://lancedb.com/)
+databases. Pick a database and a table visually,
 then run slash commands against whatever's selected — no more retyping paths and table
 names for every single query.
 
@@ -34,7 +34,7 @@ names for every single query.
 ## 📦 Installation
 
 ```bash
-pip install lancedbx
+pip install lsql
 ```
 
 ## 🚀 Quick Start
@@ -129,8 +129,8 @@ current selection.
 ## 🛠️ Development
 
 ```bash
-git clone https://github.com/wuqunfei/lancedb-cli.git
-cd lancedb-cli
+git clone https://github.com/wuqunfei/lsql.git
+cd lsql
 pip install -e ".[dev]"
 ```
 
@@ -159,7 +159,7 @@ Contributions are welcome! Please feel free to open a PR.
 
 ## 🐛 Issues
 
-Found a bug or have an idea? [Open an issue](https://github.com/wuqunfei/lancedb-cli/issues).
+Found a bug or have an idea? [Open an issue](https://github.com/wuqunfei/lsql/issues).
 
 ## 📄 License
 

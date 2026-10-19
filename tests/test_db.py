@@ -1,12 +1,12 @@
-"""Tests for lancedbx.core.db against a real throwaway LanceDB directory."""
+"""Tests for lsql.core.db against a real throwaway LanceDB directory."""
 
 from pathlib import Path
 
 import pandas as pd
 import pytest
 
-from lancedbx.core import db
-from lancedbx.core.exceptions import CommandError
+from lsql.core import db
+from lsql.core.exceptions import CommandError
 
 SAMPLE_CSV = Path(__file__).parent.parent / "test_data" / "sample.csv"
 

@@ -6,15 +6,18 @@ from typing import List, Optional
 
 
 def default_config_dir() -> Path:
-    new_dir = Path.home() / ".config" / "lancedbx"
-    old_dir = Path.home() / ".config" / "lancedb-cli"
-    if not new_dir.exists() and old_dir.exists():
-        # One-time migration from the project's old name — preserves existing
+    new_dir = Path.home() / ".config" / "lsql"
+    old_dirs = [Path.home() / ".config" / "lancedbx", Path.home() / ".config" / "lancedb-cli"]
+    if not new_dir.exists():
+        # One-time migration from the project's old names — preserves existing
         # recent-databases/command-history data instead of silently orphaning it.
-        try:
-            old_dir.rename(new_dir)
-        except OSError:
-            pass
+        for old_dir in old_dirs:
+            if old_dir.exists():
+                try:
+                    old_dir.rename(new_dir)
+                except OSError:
+                    pass
+                break
     return new_dir
 
 

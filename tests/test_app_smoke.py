@@ -4,13 +4,13 @@ from pathlib import Path
 
 import pytest
 
-from lancedbx import persistence
-from lancedbx.core import db
-from lancedbx.tui.app import LanceDBApp
-from lancedbx.tui.widgets.command_input_panel import CommandInputPanel, HistoryInput
-from lancedbx.tui.widgets.database_panel import DatabasePanel
-from lancedbx.tui.widgets.results_panel import ResultsDataTable, ResultsPanel
-from lancedbx.tui.widgets.table_list_panel import TableListPanel
+from lsql import persistence
+from lsql.core import db
+from lsql.tui.app import LanceDBApp
+from lsql.tui.widgets.command_input_panel import CommandInputPanel, HistoryInput
+from lsql.tui.widgets.database_panel import DatabasePanel
+from lsql.tui.widgets.results_panel import ResultsDataTable, ResultsPanel
+from lsql.tui.widgets.table_list_panel import TableListPanel
 
 SAMPLE_CSV = Path(__file__).parent.parent / "test_data" / "sample.csv"
 
@@ -28,7 +28,7 @@ async def type_and_submit(pilot, selector, text):
 
 def make_app(tmp_path, initial_db_path=None):
     """Build a LanceDBApp with persistence isolated to tmp_path, never touching the
-    user's real ~/.config/lancedbx/."""
+    user's real ~/.config/lsql/."""
     return LanceDBApp(
         initial_db_path=initial_db_path,
         recent_databases=persistence.RecentDatabases(path=tmp_path / "recent.json"),
@@ -57,7 +57,7 @@ async def test_table_list_scrolls_with_many_tables(tmp_path):
     import pandas as pd
     from textual.widgets import ListView
 
-    from lancedbx.core import db as core_db
+    from lsql.core import db as core_db
 
     db_path = tmp_path / "manytables.lance"
     conn = core_db.connect(str(db_path))
@@ -119,7 +119,7 @@ async def test_open_button_opens_and_cancel_closes_modal(tmp_path):
 async def test_directory_browser_modal_open_returns_start_path(tmp_path, db_with_table):
     from textual.app import App
 
-    from lancedbx.tui.widgets.directory_browser_modal import DirectoryBrowserModal
+    from lsql.tui.widgets.directory_browser_modal import DirectoryBrowserModal
 
     from textual import work
 
@@ -210,7 +210,7 @@ async def test_exit_ends_the_app(tmp_path, db_with_table):
 async def test_results_pagination(tmp_path):
     import pandas as pd
 
-    from lancedbx.core import db as core_db
+    from lsql.core import db as core_db
     from textual.widgets import Button, DataTable, Static
 
     db_path = tmp_path / "bigdb.lance"
@@ -262,7 +262,7 @@ async def test_double_click_cell_shows_full_value(tmp_path):
     import pandas as pd
     from textual.widgets import TextArea
 
-    from lancedbx.core import db as core_db
+    from lsql.core import db as core_db
 
     db_path = tmp_path / "longdb.lance"
     conn = core_db.connect(str(db_path))
@@ -296,7 +296,7 @@ async def test_double_click_cell_shows_full_value(tmp_path):
 async def test_cell_detail_copy_button_copies_full_value(tmp_path):
     import pandas as pd
 
-    from lancedbx.core import db as core_db
+    from lsql.core import db as core_db
 
     db_path = tmp_path / "copydb.lance"
     conn = core_db.connect(str(db_path))
@@ -323,7 +323,7 @@ async def test_cell_detail_update_writes_new_value_and_refreshes(tmp_path):
     import pandas as pd
     from textual.widgets import TextArea
 
-    from lancedbx.core import db as core_db
+    from lsql.core import db as core_db
 
     db_path = tmp_path / "editdb.lance"
     conn = core_db.connect(str(db_path))

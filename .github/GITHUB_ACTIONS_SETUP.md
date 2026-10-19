@@ -47,7 +47,7 @@ This project includes GitHub Actions workflows to automatically build and publis
 ### Step 4: Configure your package
 
 Make sure these values are updated in `pyproject.toml`:
-- `name` - Your package name (e.g., `lancedbx`)
+- `name` - Your package name (e.g., `lsql`)
 - `version` - Current version (e.g., `0.1.0`)
 - `author` - Your name
 - `author_email` - Your email
@@ -70,9 +70,9 @@ twine upload dist/*
 Once everything is configured, publishing is simple:
 
 ```bash
-# 1. Update __version__ in lancedbx/__init__.py
+# 1. Update __version__ in lsql/__init__.py
 # 2. Commit changes
-git add lancedbx/__init__.py
+git add lsql/__init__.py
 git commit -m "Bump version to 0.2.0"
 
 # 3. Create and push a tag
@@ -91,10 +91,10 @@ The GitHub Action will automatically:
 After publishing, verify your package is on PyPI:
 
 ```bash
-pip install lancedbx
+pip install lsql
 ```
 
-Check PyPI: https://pypi.org/project/lancedbx/
+Check PyPI: https://pypi.org/project/lsql/
 
 ## Troubleshooting
 
@@ -135,7 +135,7 @@ env:
 
 Then test with:
 ```bash
-pip install -i https://test.pypi.org/simple/ lancedbx
+pip install -i https://test.pypi.org/simple/ lsql
 ```
 
 ## Security Notes

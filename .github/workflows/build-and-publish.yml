@@ -34,7 +34,7 @@ jobs:
         /tmp/wheel-check/bin/pip install --upgrade pip
         /tmp/wheel-check/bin/pip install dist/*.whl
         /tmp/wheel-check/bin/lsql --help > /dev/null && echo "✓ lsql --help works from installed wheel"
-        /tmp/wheel-check/bin/python -c "import lancedbx, pathlib; css = pathlib.Path(lancedbx.__file__).parent / 'tui' / 'app.tcss'; assert css.exists(), f'{css} missing from installed wheel'; print('✓ tui/app.tcss packaged correctly')"
+        /tmp/wheel-check/bin/python -c "import lsql, pathlib; css = pathlib.Path(lsql.__file__).parent / 'tui' / 'app.tcss'; assert css.exists(), f'{css} missing from installed wheel'; print('✓ tui/app.tcss packaged correctly')"
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
