@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -136,6 +137,16 @@ def test_build_row_where_clause_quotes_strings_and_leaves_numbers_bare():
 def test_build_row_where_clause_raises_on_empty_row():
     with pytest.raises(CommandError, match="no other columns"):
         db.build_row_where_clause({})
+
+
+def test_build_row_where_clause_skips_vector_columns():
+    # Regression test: a vector/embedding column's value is a multi-element array,
+    # which can't be expressed as a single SQL equality literal. Including it used to
+    # crash with "ValueError: can only convert an array of size 1 to a Python scalar".
+    row = {"id": 1, "embedding": np.array([0.1, 0.2, 0.3]), "name": "O'Brien"}
+    clause = db.build_row_where_clause(row)
+    assert clause == "id = 1 AND name = 'O''Brien'"
+    assert "embedding" not in clause
 
 
 def test_build_row_where_clause_handles_numpy_scalars_from_a_real_dataframe(people):

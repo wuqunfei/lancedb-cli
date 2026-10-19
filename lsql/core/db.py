@@ -148,18 +148,32 @@ def _sql_literal(value: Any) -> str:
     return f"'{escaped}'"
 
 
+def _is_vector_value(value: Any) -> bool:
+    """True for embedding/vector-column values (multi-element arrays or lists) — these
+    can't be expressed as a single SQL equality literal, so they're excluded from
+    row-matching WHERE clauses."""
+    size = getattr(value, "size", None)
+    if size is not None:
+        return size != 1
+    return isinstance(value, (list, tuple)) and len(value) != 1
+
+
 def build_row_where_clause(row: Dict[str, Any]) -> str:
     """Build a WHERE clause matching a row by exact equality on every given column —
     used to target a specific row (e.g. the one behind a cell a user just edited) when
-    there's no known primary key. Raises CommandError if given no columns to match on."""
-    if not row:
-        raise CommandError("Cannot identify this row to update: no other columns to match on")
+    there's no known primary key. Vector/embedding columns are skipped, since their
+    values can't be expressed as a SQL equality literal. Raises CommandError if given
+    no columns to match on."""
     parts = []
     for col, value in row.items():
+        if _is_vector_value(value):
+            continue
         if value is None or (isinstance(value, float) and pd.isna(value)):
             parts.append(f"{col} IS NULL")
         else:
             parts.append(f"{col} = {_sql_literal(value)}")
+    if not parts:
+        raise CommandError("Cannot identify this row to update: no other columns to match on")
     return " AND ".join(parts)
 
 
