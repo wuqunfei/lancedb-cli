@@ -8,6 +8,7 @@ import duckdb
 import lancedb
 import numpy as np
 import pandas as pd
+import pyarrow as pa
 
 from .exceptions import CommandError
 
@@ -313,3 +314,113 @@ def embed_table(
         raise CommandError(f"Writing embedded table failed: {e}")
 
     return df
+
+
+def has_fts_index(tbl, column: str) -> bool:
+    """True if `column` already has a full-text (inverted) index built on it."""
+    return any(idx.index_type == "FTS" and column in idx.columns for idx in tbl.list_indices())
+
+
+def create_fts_index(conn: lancedb.DBConnection, table_name: str, column: str) -> None:
+    """Create (or replace) a full-text index on `column`. Required before /search can
+    run in fts or hybrid mode — LanceDB raises a hard error for either without one."""
+    tbl = open_table(conn, table_name)
+    if column not in tbl.schema.names:
+        raise CommandError(f"Column '{column}' not found in table '{table_name}'")
+    try:
+        from lancedb.index import FTS
+
+        tbl.create_index(column, config=FTS())
+    except Exception as e:
+        raise CommandError(f"Could not create FTS index on '{column}': {e}")
+
+
+def _resolve_vector_column(tbl, explicit: Optional[str]) -> str:
+    """Pick which vector column to search against. An explicit --vector-column always
+    wins; otherwise auto-infer only if the table has exactly one vector-shaped column —
+    tables can carry several after repeated /embedding runs, and guessing wrong would
+    silently search the wrong embedding space."""
+    vector_cols = [f.name for f in tbl.schema if pa.types.is_fixed_size_list(f.type)]
+    if explicit:
+        if explicit not in vector_cols:
+            raise CommandError(
+                f"'{explicit}' is not a vector column. Vector columns in this table: "
+                f"{', '.join(vector_cols) or 'none'}"
+            )
+        return explicit
+    if not vector_cols:
+        raise CommandError("No vector columns found in this table. Run /embedding first.")
+    if len(vector_cols) > 1:
+        raise CommandError(
+            f"Multiple vector columns found ({', '.join(vector_cols)}); specify --vector-column"
+        )
+    return vector_cols[0]
+
+
+def search_table(
+    conn: lancedb.DBConnection,
+    table_name: str,
+    mode: str,
+    query: str,
+    vector_column: Optional[str] = None,
+    text_column: Optional[str] = None,
+    model_name: str = DEFAULT_EMBEDDING_MODEL,
+    limit: int = 10,
+    where: Optional[str] = None,
+    select: Optional[str] = None,
+) -> pd.DataFrame:
+    """Vector, full-text, or hybrid search against a table.
+
+    vector: embeds `query` via the current embedding model and runs an exact kNN scan
+    (brute-force — lsql's tables are small enough that no ANN index is required).
+    fts: keyword search against `text_column`, auto-creating its FTS index on first use.
+    hybrid: both of the above combined via LanceDB's default RRF reranker.
+    """
+    if mode not in ("vector", "fts", "hybrid"):
+        raise CommandError(f"Unknown search mode '{mode}'. Use vector, fts, or hybrid")
+
+    tbl = open_table(conn, table_name)
+    needs_vector = mode in ("vector", "hybrid")
+    needs_text = mode in ("fts", "hybrid")
+
+    vec = None
+    resolved_vector_col = None
+    if needs_vector:
+        resolved_vector_col = _resolve_vector_column(tbl, vector_column)
+        embed_fn = get_embedding_function(model_name)
+        try:
+            vec = np.asarray(embed_fn.generate_embeddings([query])[0], dtype=np.float32)
+        except Exception as e:
+            raise CommandError(f"Could not embed query: {e}")
+
+    if needs_text:
+        if not text_column:
+            raise CommandError("--text-column is required for fts/hybrid search")
+        if text_column not in tbl.schema.names:
+            raise CommandError(f"Column '{text_column}' not found in table '{table_name}'")
+        if not has_fts_index(tbl, text_column):
+            create_fts_index(conn, table_name, text_column)
+            tbl = open_table(conn, table_name)
+
+    try:
+        if mode == "vector":
+            builder = tbl.search(vec, vector_column_name=resolved_vector_col, query_type="vector")
+        elif mode == "fts":
+            builder = tbl.search(query, query_type="fts", fts_columns=text_column)
+        else:
+            builder = tbl.search(
+                query_type="hybrid", vector_column_name=resolved_vector_col, fts_columns=text_column
+            )
+            builder = builder.vector(vec).text(query)
+
+        if where:
+            builder = builder.where(where)
+        results = builder.limit(limit).to_pandas()
+    except Exception as e:
+        raise CommandError(f"Search failed: {e}")
+
+    if select:
+        cols = [c.strip() for c in select.split(",")]
+        results = results[[c for c in cols if c in results.columns]]
+
+    return results

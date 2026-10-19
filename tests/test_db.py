@@ -284,3 +284,115 @@ def test_get_embedding_function_disables_tqdm_multiprocessing_lock(monkeypatch):
     db.get_embedding_function.cache_clear()
 
     assert tqdm.std.TqdmDefaultWriteLock.mp_lock is None
+
+
+def test_has_fts_index_false_before_creation(people):
+    tbl = db.open_table(people, "people")
+    assert db.has_fts_index(tbl, "city") is False
+
+
+def test_create_fts_index_then_has_fts_index_true(people):
+    db.create_fts_index(people, "people", "city")
+    tbl = db.open_table(people, "people")
+    assert db.has_fts_index(tbl, "city") is True
+
+
+def test_create_fts_index_missing_column_raises(people):
+    with pytest.raises(CommandError, match="not found"):
+        db.create_fts_index(people, "people", "nope")
+
+
+def test_search_vector_mode_returns_closest_row(people, fake_embedding):
+    # _FakeEmbeddingFunction embeds any text as [len(text), 0, 0, 0] — query with text
+    # of the same length as a target row's "name" to get an (almost) exact vector match.
+    db.embed_table(people, "people", ["name"], ["vector"])
+    target_name = db.query_table(people, "people", limit=1)["name"].iloc[0]
+    result = db.search_table(people, "people", mode="vector", query="x" * len(target_name), limit=1)
+    assert len(result) == 1
+    assert result["name"].iloc[0] == target_name
+
+
+def test_search_vector_mode_infers_single_vector_column(people, fake_embedding):
+    db.embed_table(people, "people", ["name"], ["vector"])
+    # No --vector-column given — only one vector column exists, so it's auto-inferred.
+    result = db.search_table(people, "people", mode="vector", query="hello", limit=3)
+    assert len(result) == 3
+
+
+def test_search_vector_mode_ambiguous_without_explicit_column_raises(people, fake_embedding):
+    db.embed_table(people, "people", ["name", "city"], ["name_vector", "city_vector"])
+    with pytest.raises(CommandError, match="Multiple vector columns"):
+        db.search_table(people, "people", mode="vector", query="hello", limit=3)
+
+
+def test_search_vector_mode_with_explicit_column_resolves_ambiguity(people, fake_embedding):
+    db.embed_table(people, "people", ["name", "city"], ["name_vector", "city_vector"])
+    result = db.search_table(
+        people, "people", mode="vector", query="hello", vector_column="city_vector", limit=3
+    )
+    assert len(result) == 3
+
+
+def test_search_vector_mode_unknown_explicit_column_raises(people, fake_embedding):
+    db.embed_table(people, "people", ["name"], ["vector"])
+    with pytest.raises(CommandError, match="not a vector column"):
+        db.search_table(people, "people", mode="vector", query="hello", vector_column="nope")
+
+
+def test_search_vector_mode_no_vector_columns_raises(people):
+    with pytest.raises(CommandError, match="No vector columns"):
+        db.search_table(people, "people", mode="vector", query="hello")
+
+
+def test_search_fts_mode_auto_creates_index_and_returns_results(people):
+    tbl = db.open_table(people, "people")
+    assert db.has_fts_index(tbl, "city") is False
+    result = db.search_table(people, "people", mode="fts", query="New York", text_column="city", limit=5)
+    assert len(result) >= 1
+    tbl = db.open_table(people, "people")
+    assert db.has_fts_index(tbl, "city") is True
+
+
+def test_search_fts_mode_reuses_existing_index(people, monkeypatch):
+    db.create_fts_index(people, "people", "city")
+    calls = []
+    original = db.create_fts_index
+
+    def spy(*args, **kwargs):
+        calls.append(args)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(db, "create_fts_index", spy)
+    db.search_table(people, "people", mode="fts", query="New York", text_column="city", limit=5)
+    assert calls == []  # index already existed — must not be rebuilt
+
+
+def test_search_fts_mode_requires_text_column(people):
+    with pytest.raises(CommandError, match="--text-column"):
+        db.search_table(people, "people", mode="fts", query="New York")
+
+
+def test_search_hybrid_mode_requires_text_column(people, fake_embedding):
+    db.embed_table(people, "people", ["name"], ["vector"])
+    with pytest.raises(CommandError, match="--text-column"):
+        db.search_table(people, "people", mode="hybrid", query="New York")
+
+
+def test_search_hybrid_mode_returns_results(people, fake_embedding):
+    db.embed_table(people, "people", ["name"], ["vector"])
+    result = db.search_table(
+        people, "people", mode="hybrid", query="New York", text_column="city", limit=5
+    )
+    assert len(result) >= 1
+    assert "_relevance_score" in result.columns
+
+
+def test_search_unknown_mode_raises(people):
+    with pytest.raises(CommandError, match="Unknown search mode"):
+        db.search_table(people, "people", mode="nope", query="x")
+
+
+def test_search_applies_select(people, fake_embedding):
+    db.embed_table(people, "people", ["name"], ["vector"])
+    result = db.search_table(people, "people", mode="vector", query="hello", select="name", limit=3)
+    assert list(result.columns) == ["name"]
