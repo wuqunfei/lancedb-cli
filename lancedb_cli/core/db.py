@@ -133,6 +133,36 @@ def update_rows(conn: lancedb.DBConnection, table_name: str, values: Dict[str, A
         raise CommandError(f"Update failed. Columns: {values}, WHERE: {where}. Error: {e}")
 
 
+def _sql_literal(value: Any) -> str:
+    if hasattr(value, "item"):
+        # Unwrap numpy scalars (int64, float64, bool_, ...) to native Python types —
+        # isinstance(numpy.int64(1), int) is False, which would otherwise misquote them.
+        value = value.item()
+    if value is None or (isinstance(value, float) and pd.isna(value)):
+        return "NULL"
+    if isinstance(value, bool):
+        return "TRUE" if value else "FALSE"
+    if isinstance(value, (int, float)):
+        return str(value)
+    escaped = str(value).replace("'", "''")
+    return f"'{escaped}'"
+
+
+def build_row_where_clause(row: Dict[str, Any]) -> str:
+    """Build a WHERE clause matching a row by exact equality on every given column —
+    used to target a specific row (e.g. the one behind a cell a user just edited) when
+    there's no known primary key. Raises CommandError if given no columns to match on."""
+    if not row:
+        raise CommandError("Cannot identify this row to update: no other columns to match on")
+    parts = []
+    for col, value in row.items():
+        if value is None or (isinstance(value, float) and pd.isna(value)):
+            parts.append(f"{col} IS NULL")
+        else:
+            parts.append(f"{col} = {_sql_literal(value)}")
+    return " AND ".join(parts)
+
+
 def load_csv(conn: lancedb.DBConnection, csv_path: str, table_name: str, overwrite: bool = False) -> pd.DataFrame:
     """Load a CSV file into a table, returning the loaded DataFrame."""
     path = Path(csv_path)

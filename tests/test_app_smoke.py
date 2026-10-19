@@ -53,6 +53,48 @@ async def test_all_four_panels_render_on_launch(tmp_path):
         assert app.query_one(ResultsPanel)
 
 
+async def test_table_list_scrolls_with_many_tables(tmp_path):
+    import pandas as pd
+    from textual.widgets import ListView
+
+    from lancedb_cli.core import db as core_db
+
+    db_path = tmp_path / "manytables.lance"
+    conn = core_db.connect(str(db_path))
+    for i in range(50):
+        conn.create_table(f"table_{i:03d}", data=pd.DataFrame({"id": [1]}))
+
+    app = make_app(tmp_path, initial_db_path=str(db_path))
+    async with app.run_test(size=(120, 30)) as pilot:
+        await pilot.pause()
+        list_view = app.query_one("#table-list", ListView)
+        assert len(list_view.children) == 50
+        # more rows than fit on screen -> scrolling is possible and reaches every item
+        assert list_view.virtual_size.height > list_view.region.height
+        list_view.scroll_end(animate=False)
+        await pilot.pause()
+        assert list_view.scroll_y == list_view.max_scroll_y > 0
+
+
+async def test_theme_toggle_switches_theme_and_icon(tmp_path):
+    from textual.widgets import Button
+
+    app = make_app(tmp_path)
+    async with app.run_test() as pilot:
+        await pilot.pause(0.2)
+        icon_button = app.query_one("#theme-toggle-button", Button)
+        starting_theme = app.theme
+
+        await pilot.click("#theme-toggle-button")
+        await pilot.pause(0.3)
+        assert app.theme != starting_theme
+        assert str(icon_button.label) == ("🌙" if app.theme == "textual-dark" else "☀️")
+
+        await pilot.click("#theme-toggle-button")
+        await pilot.pause(0.3)
+        assert app.theme == starting_theme
+
+
 async def test_create_command_opens_database_and_populates_table_list(tmp_path, db_with_table):
     app = make_app(tmp_path)
     async with app.run_test() as pilot:
@@ -62,27 +104,10 @@ async def test_create_command_opens_database_and_populates_table_list(tmp_path, 
         assert names == ["people"]
 
 
-async def test_clicking_recent_database_reopens_it(tmp_path, db_with_table):
-    other_db = tmp_path / "other.lance"
-
+async def test_open_button_opens_and_cancel_closes_modal(tmp_path):
     app = make_app(tmp_path)
     async with app.run_test() as pilot:
-        await pilot.pause()
-        # Recent list is most-recent-first: after opening these two in order, row 0 is
-        # other_db and row 1 is db_with_table.
-        await type_and_submit(pilot, "#command-input", f"/create --path {db_with_table}")
-        await type_and_submit(pilot, "#command-input", f"/create --path {other_db}")
-        assert app.state.current_db_path == str(other_db)
-
-        await pilot.click("#recent-db-list", offset=(2, 1))
-        await pilot.pause()
-        assert app.state.current_db_path == db_with_table
-
-
-async def test_browse_button_opens_and_cancel_closes_modal(tmp_path):
-    app = make_app(tmp_path)
-    async with app.run_test() as pilot:
-        await pilot.click("#browse-db-button")
+        await pilot.click("#open-db-button")
         await pilot.pause()
         assert len(app.screen_stack) == 2
         await pilot.click("#browser-cancel")
@@ -235,6 +260,7 @@ async def test_results_pagination(tmp_path):
 
 async def test_double_click_cell_shows_full_value(tmp_path):
     import pandas as pd
+    from textual.widgets import TextArea
 
     from lancedb_cli.core import db as core_db
 
@@ -258,13 +284,73 @@ async def test_double_click_cell_shows_full_value(tmp_path):
 
         assert len(app.screen_stack) == 2
         title = str(app.screen.query_one("#cell-detail-title").render())
-        value = str(app.screen.query_one("#cell-detail-value").render())
+        value_area = app.screen.query_one("#cell-detail-value", TextArea)
         assert "notes" in title
-        assert value == long_text
+        assert value_area.text == long_text
 
         await pilot.click("#cell-detail-close")
         await pilot.pause()
         assert len(app.screen_stack) == 1
+
+
+async def test_cell_detail_copy_button_copies_full_value(tmp_path):
+    import pandas as pd
+
+    from lancedb_cli.core import db as core_db
+
+    db_path = tmp_path / "copydb.lance"
+    conn = core_db.connect(str(db_path))
+    long_text = "Y" * 150
+    conn.create_table("t", data=pd.DataFrame({"id": [1], "notes": [long_text]}))
+
+    app = make_app(tmp_path, initial_db_path=str(db_path))
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.click("#table-list ListItem")
+        await pilot.pause(0.2)
+
+        table = app.query_one("#results-table", ResultsDataTable)
+        notes_x = table.ordered_columns[0].width + 3
+        await pilot.click("#results-table", offset=(notes_x, 1), times=2)
+        await pilot.pause(0.2)
+
+        await pilot.click("#cell-detail-copy")
+        await pilot.pause()
+        assert app.clipboard == long_text
+
+
+async def test_cell_detail_update_writes_new_value_and_refreshes(tmp_path):
+    import pandas as pd
+    from textual.widgets import TextArea
+
+    from lancedb_cli.core import db as core_db
+
+    db_path = tmp_path / "editdb.lance"
+    conn = core_db.connect(str(db_path))
+    conn.create_table("people", data=pd.DataFrame({"id": [1, 2], "city": ["NYC", "LA"]}))
+
+    app = make_app(tmp_path, initial_db_path=str(db_path))
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.click("#table-list ListItem")
+        await pilot.pause(0.2)
+
+        table = app.query_one("#results-table", ResultsDataTable)
+        city_x = table.ordered_columns[0].width + 3
+        await pilot.click("#results-table", offset=(city_x, 1), times=2)  # row 0 = id 1, city NYC
+        await pilot.pause(0.2)
+        assert len(app.screen_stack) == 2
+
+        app.screen.query_one("#cell-detail-value", TextArea).text = "Remote"
+        await pilot.click("#cell-detail-update")
+        await pilot.pause(0.3)
+
+        assert len(app.screen_stack) == 1
+        result = core_db.query_table(app.state.connection, "people", where="id = 1")
+        assert result["city"].iloc[0] == "Remote"
+        # row 2 (LA) must be untouched
+        other = core_db.query_table(app.state.connection, "people", where="id = 2")
+        assert other["city"].iloc[0] == "LA"
 
 
 async def test_slash_command_autosuggestion(tmp_path):

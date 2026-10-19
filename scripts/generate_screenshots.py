@@ -47,7 +47,7 @@ async def scenario_launch(tmp_path: Path) -> None:
 async def scenario_browser(tmp_path: Path) -> None:
     app = make_app(tmp_path)
     async with app.run_test(size=SIZE) as pilot:
-        await pilot.click("#browse-db-button")
+        await pilot.click("#open-db-button")
         await shot(app, pilot, "02-browse-database")
         await pilot.click("#browser-cancel")
 

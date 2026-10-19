@@ -18,26 +18,43 @@ Screen {
 
 DatabasePanel {
     height: auto;
-    max-height: 12;
     border: round $primary;
     padding: 0 1;
 }
 
-#recent-db-list {
-    height: auto;
-    max-height: 5;
+#db-path-input {
+    margin-top: 0;
 }
 
-#db-path-input {
+#database-panel-actions {
+    height: 1;
     margin-top: 1;
 }
 
-#browse-db-button {
+#open-db-button {
     height: 1;
     min-width: 0;
     border: none;
     padding: 0 1;
-    margin-top: 1;
+}
+
+#theme-toggle-button {
+    height: 1;
+    min-width: 0;
+    width: 4;
+    border: none;
+    padding: 0 1;
+    margin-left: 1;
+    background: transparent;
+}
+
+#theme-toggle-button:hover {
+    background: transparent;
+}
+
+#theme-toggle-button:focus {
+    background: transparent;
+    text-style: none;
 }
 
 TableListPanel {
@@ -191,20 +208,21 @@ CellDetailModal {
 }
 
 #cell-detail-value {
-    width: auto;
-    min-width: 100%;
-}
-
-#cell-detail-dialog > VerticalScroll {
     height: 1fr;
     margin-top: 1;
     border: solid $primary-darken-1;
 }
 
-#cell-detail-close {
+#cell-detail-buttons {
+    height: auto;
+    margin-top: 1;
+    align: right middle;
+}
+
+#cell-detail-copy, #cell-detail-update, #cell-detail-close {
     height: 1;
     min-width: 0;
     border: none;
     padding: 0 1;
-    margin-top: 1;
+    margin-left: 2;
 }

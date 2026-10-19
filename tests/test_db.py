@@ -126,3 +126,29 @@ def test_dump_csv_existing_without_overwrite_raises(people, tmp_path):
     out.write_text("x")
     with pytest.raises(CommandError, match="already exists"):
         db.dump_csv(people, "people", str(out))
+
+
+def test_build_row_where_clause_quotes_strings_and_leaves_numbers_bare():
+    clause = db.build_row_where_clause({"id": 1, "name": "O'Brien", "active": True, "note": None})
+    assert clause == "id = 1 AND name = 'O''Brien' AND active = TRUE AND note IS NULL"
+
+
+def test_build_row_where_clause_raises_on_empty_row():
+    with pytest.raises(CommandError, match="no other columns"):
+        db.build_row_where_clause({})
+
+
+def test_build_row_where_clause_handles_numpy_scalars_from_a_real_dataframe(people):
+    # Regression test: numpy.int64/float64/bool_ from df.iloc[...] are not instances of
+    # Python's int/float, so a naive isinstance check would wrongly quote them as strings
+    # (e.g. "id = '1'"), which lancedb's strict filter engine rejects against an Int64 column.
+    row = db.query_table(people, "people", where="id = 1").iloc[0]
+    where_row = {col: val for col, val in row.items() if col != "city"}
+    clause = db.build_row_where_clause(where_row)
+    assert "id = 1" in clause
+    assert "id = '1'" not in clause
+
+    # And it must actually work against the real table, not just look right as a string.
+    db.update_rows(people, "people", {"name": "Updated Name"}, clause)
+    result = db.query_table(people, "people", where="id = 1")
+    assert result["name"].iloc[0] == "Updated Name"

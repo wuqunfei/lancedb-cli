@@ -18,7 +18,7 @@ from textual.widgets import Button, DataTable, Static
 
 from ...commands.results import CommandResult
 from ...core.parsing import truncate_value
-from .cell_detail_modal import CellDetailModal
+from .cell_detail_modal import CellDetailModal, CellDialogResult
 
 DEFAULT_PAGE_SIZE = 100
 
@@ -46,6 +46,16 @@ class ResultsDataTable(DataTable):
 
 
 class ResultsPanel(Vertical):
+    class CellUpdateRequested(Message):
+        """A user edited a cell's value in the detail dialog and hit Update. `where_row`
+        is every other column's current value in that row, for matching it uniquely."""
+
+        def __init__(self, column: str, new_text: str, where_row: dict) -> None:
+            self.column = column
+            self.new_text = new_text
+            self.where_row = where_row
+            super().__init__()
+
     def __init__(self, page_size: int = DEFAULT_PAGE_SIZE, **kwargs):
         super().__init__(**kwargs)
         self.border_title = "Results"
@@ -126,8 +136,15 @@ class ResultsPanel(Vertical):
         if row_idx >= len(self._df) or not (0 <= col_idx < len(self._df.columns)):
             return
         column_name = str(self._df.columns[col_idx])
-        value = self._df.iloc[row_idx, col_idx]
-        self.app.push_screen(CellDetailModal(column_name, value))
+        row = self._df.iloc[row_idx]
+        value = row[column_name]
+        where_row = {str(col): val for col, val in row.items() if str(col) != column_name}
+
+        def handle_result(result: Optional[CellDialogResult]) -> None:
+            if result is not None and result.action == "update":
+                self.post_message(self.CellUpdateRequested(column_name, result.new_text, where_row))
+
+        self.app.push_screen(CellDetailModal(column_name, value), callback=handle_result)
 
     def clear(self) -> None:
         self._df = None

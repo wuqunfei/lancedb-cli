@@ -19,13 +19,14 @@ whatever's selected — no more retyping paths and table names for every single 
 - 🖱️ **Click a table to preview it** — instantly runs `select * from <table> limit 100`
   for you
 - 🔍 **Double-click any cell** — pop open the full, untruncated value when a row is too
-  wide to read comfortably
+  wide to read comfortably, with buttons to **copy** it or **edit and write it back**
 - 📄 **Pagination** — large result sets are paged 100 rows at a time instead of flooding
   the screen
 - 🧮 **Raw SQL via DuckDB** — `/sql` runs across every table in the database
 - 🛟 **Confirmation dialogs** — `/drop`, `/empty`, and `/delete` always ask first
 - ⏪ **Command history** — up/down arrow recall, just like a shell
 - 📚 **Built-in help** — `/help` lists every command; `/help <command>` shows its flags
+- 🌓 **Light/dark theme** — a one-click toggle, defaulting to your OS's current setting
 
 ---
 
@@ -46,11 +47,11 @@ lsql /path/to/database    # launch pre-connected to a database
 
 ## 🧭 A tour of the four panels
 
-### 1️⃣ Database — pick, type, or browse
+### 1️⃣ Database — type a path or browse to one
 
-Recently-opened databases show up in a list for one click reopening. You can also type a
-path directly and hit Enter, or click **Browse...** to pick a folder visually (with an
-**Up** button to walk back up the directory tree).
+Type a path directly and hit Enter, or click **Open...** to pick a folder visually (with
+an **Up** button to walk back up the directory tree). The 🌙/☀️ icon next to it toggles
+light/dark theme — it defaults to whatever your OS is currently using.
 
 ![browse database screenshot](docs/screenshots/02-browse-database.svg)
 
@@ -89,8 +90,8 @@ Large results are paginated — 100 rows per page, with `< Prev` / `Next >` cont
 
 ![pagination screenshot](docs/screenshots/08-pagination.svg)
 
-And if a cell's value is too long to read in the table, double-click it for the full
-text:
+And if a cell's value is too long to read in the table, double-click it to see the full
+text, copy it, or edit it and write the change back to the table:
 
 ![cell detail popup screenshot](docs/screenshots/09-cell-detail.svg)
 

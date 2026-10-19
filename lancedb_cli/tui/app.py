@@ -13,6 +13,8 @@ from ..commands import results as cmdresults
 from ..commands.results import AppState, CommandResult
 from ..core import db
 from ..core.exceptions import CommandError
+from ..core.parsing import convert_value
+from ..core.system_theme import system_prefers_dark
 from .widgets.command_input_panel import CommandInputPanel
 from .widgets.confirm_modal import ConfirmModal
 from .widgets.database_panel import DatabasePanel
@@ -39,11 +41,12 @@ class LanceDBApp(App):
         self.recent_dbs = recent_databases or persistence.RecentDatabases()
         self.history_store = command_history or persistence.CommandHistory()
         self._initial_db_path = initial_db_path
+        self._last_command_line: Optional[str] = None
 
     def compose(self) -> ComposeResult:
         yield Horizontal(
             Vertical(
-                DatabasePanel(recent_paths=self.recent_dbs.load(), id="database-panel"),
+                DatabasePanel(id="database-panel"),
                 TableListPanel(id="table-list-panel"),
                 id="left-column",
             ),
@@ -56,6 +59,9 @@ class LanceDBApp(App):
         )
 
     def on_mount(self) -> None:
+        is_dark = system_prefers_dark()
+        self.theme = "textual-dark" if is_dark else "textual-light"
+        self.query_one(DatabasePanel).set_theme_icon(is_dark)
         if self._initial_db_path:
             self._open_database(self._initial_db_path)
         self.query_one(CommandInputPanel).focus_input()
@@ -70,6 +76,12 @@ class LanceDBApp(App):
     @on(DatabasePanel.DatabaseSelected)
     def handle_database_selected(self, event: DatabasePanel.DatabaseSelected) -> None:
         self._open_database(event.path)
+
+    @on(DatabasePanel.ThemeToggleRequested)
+    def handle_theme_toggle_requested(self, event: DatabasePanel.ThemeToggleRequested) -> None:
+        is_dark = self.theme != "textual-light"
+        self.theme = "textual-light" if is_dark else "textual-dark"
+        self.query_one(DatabasePanel).set_theme_icon(not is_dark)
 
     @on(TableListPanel.TableSelected)
     @work
@@ -92,7 +104,25 @@ class LanceDBApp(App):
         self.query_one(CommandInputPanel).set_history(history)
         await self._run_command_line(line)
 
+    @on(ResultsPanel.CellUpdateRequested)
+    @work
+    async def handle_cell_update_requested(self, event: ResultsPanel.CellUpdateRequested) -> None:
+        if self.state.connection is None or not self.state.current_table:
+            self.query_one(ResultsPanel).show_result(cmdresults.error("No table selected to update"))
+            return
+        try:
+            where = db.build_row_where_clause(event.where_row)
+            new_value = convert_value(event.new_text)
+            db.update_rows(self.state.connection, self.state.current_table, {event.column: new_value}, where)
+        except CommandError as e:
+            self.query_one(ResultsPanel).show_result(cmdresults.error(str(e)))
+            return
+        self.notify(f"Updated '{event.column}'")
+        if self._last_command_line:
+            await self._run_command_line(self._last_command_line)
+
     async def _run_command_line(self, line: str) -> None:
+        self._last_command_line = line
         prepared = registry.prepare(self.state, line)
         if prepared is None:
             return
@@ -128,7 +158,7 @@ class LanceDBApp(App):
         self.state.connection = conn
         self.state.current_db_path = path
         self.state.current_table = None
-        self.query_one(DatabasePanel).set_recent_paths(self.recent_dbs.add(path))
+        self.recent_dbs.add(path)
         self.query_one(ResultsPanel).clear()
         self.query_one(CommandInputPanel).set_status(path, None)
         self._refresh_table_list()

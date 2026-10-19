@@ -24,7 +24,7 @@ def cmd_query(state: AppState, args: argparse.Namespace) -> r.CommandResult:
         select=args.select,
     )
     if len(df) == 0:
-        return r.ok_text(rendering.format_status("No results", style="yellow"))
+        return r.ok_text(rendering.format_status("No results", style="red"))
     if args.output == "json":
         return r.ok_text(rendering.dataframe_to_json(df))
     return r.ok_dataframe(df, title=f"Query results from {state.current_table}")
@@ -38,7 +38,7 @@ def cmd_schema(state: AppState, args: argparse.Namespace) -> r.CommandResult:
 def cmd_sql(state: AppState, raw_sql: str) -> r.CommandResult:
     df = db.run_sql(state.connection, raw_sql)
     if len(df) == 0:
-        return r.ok_text(rendering.format_status("No results", style="yellow"))
+        return r.ok_text(rendering.format_status("No results", style="red"))
     return r.ok_dataframe(df, title="SQL Query Results")
 
 
