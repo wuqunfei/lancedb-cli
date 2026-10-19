@@ -4,9 +4,9 @@ from pathlib import Path
 
 import pytest
 
-from lancedb_cli.commands import registry
-from lancedb_cli.commands.results import AppState, CommandResult, PreparedCommand
-from lancedb_cli.core import db
+from lancedbx.commands import registry
+from lancedbx.commands.results import AppState, CommandResult, PreparedCommand
+from lancedbx.core import db
 
 SAMPLE_CSV = Path(__file__).parent.parent / "test_data" / "sample.csv"
 

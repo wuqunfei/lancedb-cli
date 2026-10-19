@@ -1,4 +1,45 @@
-from lancedb_cli.persistence import CommandHistory, RecentDatabases
+from unittest.mock import patch
+
+from lancedbx.persistence import CommandHistory, RecentDatabases, default_config_dir
+
+
+def test_default_config_dir_migrates_old_directory(tmp_path):
+    home = tmp_path / "home"
+    old_dir = home / ".config" / "lancedb-cli"
+    old_dir.mkdir(parents=True)
+    (old_dir / "recent_databases.json").write_text('["/db/a"]')
+
+    with patch("lancedbx.persistence.Path.home", return_value=home):
+        config_dir = default_config_dir()
+
+    assert config_dir == home / ".config" / "lancedbx"
+    assert config_dir.exists()
+    assert not old_dir.exists()
+    assert (config_dir / "recent_databases.json").read_text() == '["/db/a"]'
+
+
+def test_default_config_dir_prefers_existing_new_dir_over_migrating(tmp_path):
+    home = tmp_path / "home"
+    old_dir = home / ".config" / "lancedb-cli"
+    old_dir.mkdir(parents=True)
+    (old_dir / "recent_databases.json").write_text('["/old"]')
+    new_dir = home / ".config" / "lancedbx"
+    new_dir.mkdir(parents=True)
+    (new_dir / "recent_databases.json").write_text('["/new"]')
+
+    with patch("lancedbx.persistence.Path.home", return_value=home):
+        config_dir = default_config_dir()
+
+    assert (config_dir / "recent_databases.json").read_text() == '["/new"]'
+    assert old_dir.exists()  # untouched, not merged or deleted
+
+
+def test_default_config_dir_with_no_old_dir(tmp_path):
+    home = tmp_path / "home"
+    home.mkdir()
+    with patch("lancedbx.persistence.Path.home", return_value=home):
+        config_dir = default_config_dir()
+    assert config_dir == home / ".config" / "lancedbx"
 
 
 def test_recent_databases_empty_by_default(tmp_path):

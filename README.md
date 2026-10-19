@@ -1,8 +1,9 @@
-# 🗄️ lsql
+# 🗄️ lancedbx
 
-**lsql** is a terminal GUI for browsing and managing [LanceDB](https://lancedb.com/)
-databases. Pick a database and a table visually, then run slash commands against
-whatever's selected — no more retyping paths and table names for every single query.
+**lancedbx** is a terminal GUI for browsing and managing [LanceDB](https://lancedb.com/)
+databases — launched with the `lsql` command. Pick a database and a table visually,
+then run slash commands against whatever's selected — no more retyping paths and table
+names for every single query.
 
 ![launch screenshot](docs/screenshots/01-launch.svg)
 
@@ -33,7 +34,7 @@ whatever's selected — no more retyping paths and table names for every single 
 ## 📦 Installation
 
 ```bash
-pip install lsql
+pip install lancedbx
 ```
 
 ## 🚀 Quick Start

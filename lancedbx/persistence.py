@@ -6,7 +6,16 @@ from typing import List, Optional
 
 
 def default_config_dir() -> Path:
-    return Path.home() / ".config" / "lancedb-cli"
+    new_dir = Path.home() / ".config" / "lancedbx"
+    old_dir = Path.home() / ".config" / "lancedb-cli"
+    if not new_dir.exists() and old_dir.exists():
+        # One-time migration from the project's old name — preserves existing
+        # recent-databases/command-history data instead of silently orphaning it.
+        try:
+            old_dir.rename(new_dir)
+        except OSError:
+            pass
+    return new_dir
 
 
 def _load_list(path: Path) -> List[str]:
