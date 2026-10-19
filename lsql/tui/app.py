@@ -18,6 +18,7 @@ from ..core.system_theme import system_prefers_dark
 from .widgets.command_input_panel import CommandInputPanel
 from .widgets.confirm_modal import ConfirmModal
 from .widgets.database_panel import DatabasePanel
+from .widgets.embedding_model_panel import EmbeddingModelPanel
 from .widgets.results_panel import ResultsPanel
 from .widgets.table_list_panel import TableListPanel
 
@@ -35,11 +36,13 @@ class LanceDBApp(App):
         initial_db_path: Optional[str] = None,
         recent_databases: Optional[persistence.RecentDatabases] = None,
         command_history: Optional[persistence.CommandHistory] = None,
+        last_embedding_model: Optional[persistence.LastEmbeddingModel] = None,
     ):
         super().__init__()
         self.state = AppState()
         self.recent_dbs = recent_databases or persistence.RecentDatabases()
         self.history_store = command_history or persistence.CommandHistory()
+        self.last_embedding_model = last_embedding_model or persistence.LastEmbeddingModel()
         self._initial_db_path = initial_db_path
         self._last_command_line: Optional[str] = None
 
@@ -47,6 +50,7 @@ class LanceDBApp(App):
         yield Horizontal(
             Vertical(
                 DatabasePanel(id="database-panel"),
+                EmbeddingModelPanel(id="embedding-model-panel"),
                 TableListPanel(id="table-list-panel"),
                 id="left-column",
             ),
@@ -64,6 +68,10 @@ class LanceDBApp(App):
         self.query_one(DatabasePanel).set_theme_icon(is_dark)
         if self._initial_db_path:
             self._open_database(self._initial_db_path)
+        last_model = self.last_embedding_model.load()
+        if last_model:
+            self.state.current_embedding_model = last_model
+            self.query_one(EmbeddingModelPanel).set_model_name(last_model)
         self.query_one(CommandInputPanel).focus_input()
 
     def action_focus_command(self) -> None:
@@ -76,6 +84,13 @@ class LanceDBApp(App):
     @on(DatabasePanel.DatabaseSelected)
     def handle_database_selected(self, event: DatabasePanel.DatabaseSelected) -> None:
         self._open_database(event.path)
+
+    @on(EmbeddingModelPanel.ModelSelected)
+    def handle_embedding_model_selected(self, event: EmbeddingModelPanel.ModelSelected) -> None:
+        self.state.current_embedding_model = event.name
+        self.last_embedding_model.set(event.name)
+        self.query_one(EmbeddingModelPanel).set_model_name(event.name)
+        self.notify(f"Embedding model set to '{event.name}'")
 
     @on(DatabasePanel.ThemeToggleRequested)
     def handle_theme_toggle_requested(self, event: DatabasePanel.ThemeToggleRequested) -> None:

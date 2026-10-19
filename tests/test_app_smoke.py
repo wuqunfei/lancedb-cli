@@ -9,6 +9,7 @@ from lsql.core import db
 from lsql.tui.app import LanceDBApp
 from lsql.tui.widgets.command_input_panel import CommandInputPanel, HistoryInput
 from lsql.tui.widgets.database_panel import DatabasePanel
+from lsql.tui.widgets.embedding_model_panel import EmbeddingModelPanel
 from lsql.tui.widgets.results_panel import ResultsDataTable, ResultsPanel
 from lsql.tui.widgets.table_list_panel import TableListPanel
 
@@ -41,6 +42,7 @@ def make_app(tmp_path, initial_db_path=None):
         initial_db_path=initial_db_path,
         recent_databases=persistence.RecentDatabases(path=tmp_path / "recent.json"),
         command_history=persistence.CommandHistory(path=tmp_path / "history.json"),
+        last_embedding_model=persistence.LastEmbeddingModel(path=tmp_path / "last_model.json"),
     )
 
 
@@ -59,6 +61,64 @@ async def test_all_four_panels_render_on_launch(tmp_path):
         assert app.query_one(TableListPanel)
         assert app.query_one(CommandInputPanel)
         assert app.query_one(ResultsPanel)
+
+
+async def test_embedding_model_panel_renders(tmp_path):
+    app = make_app(tmp_path)
+    async with app.run_test() as pilot:
+        assert app.query_one(EmbeddingModelPanel)
+
+
+async def test_last_embedding_model_prefills_without_loading(tmp_path, monkeypatch):
+    calls = []
+    monkeypatch.setattr(db, "get_embedding_function", lambda name: calls.append(name))
+
+    persistence.LastEmbeddingModel(path=tmp_path / "last_model.json").set("org/saved-model")
+
+    app = make_app(tmp_path)
+    async with app.run_test() as pilot:
+        assert app.state.current_embedding_model == "org/saved-model"
+        assert app.query_one("#embedding-model-input").value == "org/saved-model"
+    assert calls == []
+
+
+async def test_setting_embedding_model_updates_state_and_persists(tmp_path, monkeypatch):
+    monkeypatch.setattr(db, "get_embedding_function", lambda name: object())
+
+    app = make_app(tmp_path)
+    async with app.run_test() as pilot:
+        app.query_one("#embedding-model-input").value = "org/new-model"
+        await pilot.click("#set-embedding-button")
+        await _wait_until(lambda: app.state.current_embedding_model is not None, pilot)
+        assert app.state.current_embedding_model == "org/new-model"
+        assert app.query_one("#embedding-model-input").value == "org/new-model"
+
+    assert persistence.LastEmbeddingModel(path=tmp_path / "last_model.json").load() == "org/new-model"
+
+
+async def test_cancelling_embedding_modal_leaves_state_unset(tmp_path, monkeypatch):
+    import threading
+
+    never_set = threading.Event()
+
+    def blocking_get(name):
+        never_set.wait(timeout=5)
+        return object()
+
+    monkeypatch.setattr(db, "get_embedding_function", blocking_get)
+
+    app = make_app(tmp_path)
+    try:
+        async with app.run_test() as pilot:
+            app.query_one("#embedding-model-input").value = "org/new-model"
+            await pilot.click("#set-embedding-button")
+            await _wait_until(lambda: app.screen.query("#embedding-modal-cancel"), pilot)
+            await pilot.pause()
+            await pilot.click("#embedding-modal-cancel")
+            await pilot.pause()
+            assert app.state.current_embedding_model is None
+    finally:
+        never_set.set()
 
 
 async def test_table_list_scrolls_with_many_tables(tmp_path):
