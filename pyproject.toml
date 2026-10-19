@@ -10,6 +10,7 @@ readme = "README.md"
 license = {text = "Apache-2.0"}
 requires-python = ">=3.9"
 authors = [
+    {name = "Qunfei Wu", email = "wu.qunfei@gmail.com"},
     {name = "Davide Dal Farra", email = "davide@codref.org"},
 ]
 keywords = ["lancedb", "cli", "database", "duckdb", "tui", "textual"]
