@@ -4,8 +4,10 @@ from lsql.commands.parser import (
     ArgParseExit,
     build_delete_parser,
     build_embedding_parser,
+    build_index_parser,
     build_load_parser,
     build_query_parser,
+    build_search_parser,
     split_first_token,
     tokenize_rest,
 )
@@ -105,6 +107,61 @@ def test_embedding_parser_parses_all_flags():
     assert args.target == "vec1,vec2"
     assert args.model == "org/model"
     assert args.overwrite is True
+
+
+def test_index_parser_requires_column():
+    with pytest.raises(ArgParseExit):
+        build_index_parser().parse_args([])
+    args = build_index_parser().parse_args(["--column", "bio"])
+    assert args.column == "bio"
+
+
+def test_search_parser_requires_mode_and_query():
+    with pytest.raises(ArgParseExit):
+        build_search_parser().parse_args(["--query", "hello"])
+    with pytest.raises(ArgParseExit):
+        build_search_parser().parse_args(["--mode", "vector"])
+    args = build_search_parser().parse_args(["--mode", "vector", "--query", "hello"])
+    assert args.mode == "vector"
+    assert args.query == "hello"
+
+
+def test_search_parser_rejects_bad_mode_choice():
+    with pytest.raises(ArgParseExit):
+        build_search_parser().parse_args(["--mode", "nope", "--query", "hello"])
+
+
+def test_search_parser_defaults():
+    args = build_search_parser().parse_args(["--mode", "fts", "--query", "hello"])
+    assert args.vector_column is None
+    assert args.text_column is None
+    assert args.model is None
+    assert args.limit == 10
+    assert args.where is None
+    assert args.select is None
+
+
+def test_search_parser_parses_all_flags():
+    args = build_search_parser().parse_args(
+        [
+            "--mode", "hybrid",
+            "--query", "hello world",
+            "--vector-column", "bio_vector",
+            "--text-column", "bio",
+            "--model", "org/model",
+            "--limit", "5",
+            "--where", "age > 21",
+            "--select", "name,bio",
+        ]
+    )
+    assert args.mode == "hybrid"
+    assert args.query == "hello world"
+    assert args.vector_column == "bio_vector"
+    assert args.text_column == "bio"
+    assert args.model == "org/model"
+    assert args.limit == 5
+    assert args.where == "age > 21"
+    assert args.select == "name,bio"
 
 
 def test_parser_does_not_sys_exit_on_unknown_flag():
