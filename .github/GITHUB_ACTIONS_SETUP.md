@@ -47,7 +47,7 @@ This project includes GitHub Actions workflows to automatically build and publis
 ### Step 4: Configure your package
 
 Make sure these values are updated in `pyproject.toml`:
-- `name` - Your package name (e.g., `lancedb-cli`)
+- `name` - Your package name (e.g., `lsql`)
 - `version` - Current version (e.g., `0.1.0`)
 - `author` - Your name
 - `author_email` - Your email
@@ -91,10 +91,10 @@ The GitHub Action will automatically:
 After publishing, verify your package is on PyPI:
 
 ```bash
-pip install lancedb-cli
+pip install lsql
 ```
 
-Check PyPI: https://pypi.org/project/lancedb-cli/
+Check PyPI: https://pypi.org/project/lsql/
 
 ## Troubleshooting
 
@@ -135,7 +135,7 @@ env:
 
 Then test with:
 ```bash
-pip install -i https://test.pypi.org/simple/ lancedb-cli
+pip install -i https://test.pypi.org/simple/ lsql
 ```
 
 ## Security Notes

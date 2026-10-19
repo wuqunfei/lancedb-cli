@@ -1,4 +1,4 @@
-# GitHub Copilot Instructions for lancedb-cli
+# GitHub Copilot Instructions for lsql
 
 ## Project Overview
 

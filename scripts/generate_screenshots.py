@@ -32,6 +32,14 @@ def make_app(tmp_path: Path, initial_db_path: str = None) -> LanceDBApp:
     )
 
 
+async def force_dark_theme(app: LanceDBApp, pilot) -> None:
+    from lancedb_cli.tui.widgets.database_panel import DatabasePanel
+
+    app.theme = "textual-dark"
+    app.query_one(DatabasePanel).set_theme_icon(True)
+    await pilot.pause()
+
+
 async def shot(app: LanceDBApp, pilot, name: str) -> None:
     await pilot.pause(0.1)
     app.save_screenshot(filename=f"{name}.svg", path=str(SCREENSHOTS_DIR))
@@ -41,12 +49,14 @@ async def shot(app: LanceDBApp, pilot, name: str) -> None:
 async def scenario_launch(tmp_path: Path) -> None:
     app = make_app(tmp_path)
     async with app.run_test(size=SIZE) as pilot:
+        await force_dark_theme(app, pilot)
         await shot(app, pilot, "01-launch")
 
 
 async def scenario_browser(tmp_path: Path) -> None:
     app = make_app(tmp_path)
     async with app.run_test(size=SIZE) as pilot:
+        await force_dark_theme(app, pilot)
         await pilot.click("#open-db-button")
         await shot(app, pilot, "02-browse-database")
         await pilot.click("#browser-cancel")
@@ -56,6 +66,7 @@ async def scenario_table_and_query(tmp_path: Path, db_path: str) -> None:
     app = make_app(tmp_path, initial_db_path=db_path)
     async with app.run_test(size=SIZE) as pilot:
         await pilot.pause()
+        await force_dark_theme(app, pilot)
         await pilot.click("#table-list ListItem")
         await shot(app, pilot, "03-table-selected")
 
@@ -97,6 +108,7 @@ async def scenario_pagination(tmp_path: Path) -> None:
     app = make_app(tmp_path, initial_db_path=str(db_path))
     async with app.run_test(size=SIZE) as pilot:
         await pilot.pause()
+        await force_dark_theme(app, pilot)
         await pilot.click("#table-list ListItem")
         await pilot.pause(0.2)
         inp = app.query_one("#command-input")
@@ -122,6 +134,7 @@ async def scenario_cell_detail(tmp_path: Path) -> None:
     app = make_app(tmp_path, initial_db_path=str(db_path))
     async with app.run_test(size=SIZE) as pilot:
         await pilot.pause()
+        await force_dark_theme(app, pilot)
         await pilot.click("#table-list ListItem")
         await pilot.pause(0.2)
         table = app.query_one("#results-table", ResultsDataTable)

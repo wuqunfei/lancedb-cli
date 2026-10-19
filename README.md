@@ -1,6 +1,6 @@
-# 🗄️ lancedb-cli
+# 🗄️ lsql
 
-**`lsql`** is a terminal GUI for browsing and managing [LanceDB](https://lancedb.com/)
+**lsql** is a terminal GUI for browsing and managing [LanceDB](https://lancedb.com/)
 databases. Pick a database and a table visually, then run slash commands against
 whatever's selected — no more retyping paths and table names for every single query.
 
@@ -33,7 +33,7 @@ whatever's selected — no more retyping paths and table names for every single 
 ## 📦 Installation
 
 ```bash
-pip install lancedb-cli
+pip install lsql
 ```
 
 ## 🚀 Quick Start
@@ -128,7 +128,7 @@ current selection.
 ## 🛠️ Development
 
 ```bash
-git clone https://github.com/codref/lancedb-cli.git
+git clone https://github.com/wuqunfei/lancedb-cli.git
 cd lancedb-cli
 pip install -e ".[dev]"
 ```
@@ -158,7 +158,7 @@ Contributions are welcome! Please feel free to open a PR.
 
 ## 🐛 Issues
 
-Found a bug or have an idea? [Open an issue](https://github.com/codref/lancedb-cli/issues).
+Found a bug or have an idea? [Open an issue](https://github.com/wuqunfei/lancedb-cli/issues).
 
 ## 📄 License
 

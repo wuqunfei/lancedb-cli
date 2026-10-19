@@ -3,9 +3,9 @@ requires = ["setuptools>=45", "wheel", "setuptools_scm[toml]>=6.2"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "lancedb-cli"
+name = "lsql"
 dynamic = ["version"]
-description = "A minimal command line application for managing LanceDB databases"
+description = "A terminal GUI for browsing and managing LanceDB databases"
 readme = "README.md"
 license = {text = "Apache-2.0"}
 requires-python = ">=3.9"
@@ -52,10 +52,10 @@ dev = [
 version = {attr = "lancedb_cli.__version__"}
 
 [project.urls]
-Homepage = "https://github.com/codref/lancedb-cli"
-Documentation = "https://github.com/codref/lancedb-cli#readme"
-Repository = "https://github.com/codref/lancedb-cli.git"
-"Bug Tracker" = "https://github.com/codref/lancedb-cli/issues"
+Homepage = "https://github.com/wuqunfei/lancedb-cli"
+Documentation = "https://github.com/wuqunfei/lancedb-cli#readme"
+Repository = "https://github.com/wuqunfei/lancedb-cli.git"
+"Bug Tracker" = "https://github.com/wuqunfei/lancedb-cli/issues"
 
 [project.scripts]
 lsql = "lancedb_cli.__main__:main"
