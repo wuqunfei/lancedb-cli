@@ -264,17 +264,18 @@ async def test_embedding_download_modal_success_dismisses_true(monkeypatch):
     assert app.result is True
 
 
-async def test_embedding_download_modal_cancel_dismisses_false(monkeypatch):
+async def test_embedding_download_modal_disables_cancel_while_loading(monkeypatch):
     import threading
 
     from textual import work
     from textual.app import App
+    from textual.widgets import Button
 
     from lsql.core import db
     from lsql.tui.widgets.embedding_model_download_modal import EmbeddingModelDownloadModal
 
-    # Blocks until the test is done with it, so the worker thread can never race ahead
-    # and dismiss(True) before the test gets a chance to click Cancel.
+    # Blocks until the test is done with it, so the load never finishes on its own —
+    # this isolates the "while actively loading" window the test is checking.
     never_set = threading.Event()
 
     def blocking_get(name):
@@ -296,30 +297,60 @@ async def test_embedding_download_modal_cancel_dismisses_false(monkeypatch):
         async with app.run_test() as pilot:
             await _wait_until(lambda: app.screen.query("#embedding-modal-cancel"), pilot)
             await pilot.pause()
+            cancel_button = app.screen.query_one("#embedding-modal-cancel", Button)
+            assert cancel_button.disabled is True
+            # A disabled button must not respond to a click either.
             await pilot.click("#embedding-modal-cancel")
-            await _wait_until(lambda: app.result is False, pilot)
-        assert app.result is False
+            await pilot.pause()
+            assert app.result == "unset"
     finally:
-        never_set.set()  # let the blocked worker thread return instead of waiting out its timeout
+        never_set.set()
 
 
-async def test_cancelled_modal_load_does_not_pop_a_later_screen(monkeypatch):
-    # Safety-net regression test. The background load has no explicit cancellation flag
-    # of our own — Screen.dismiss() -> App.pop_screen() is unconditional (no identity
-    # check against the dismissing screen), so in principle an orphaned thread finishing
-    # late could pop whatever now happens to be on top of the stack. In practice this is
-    # currently prevented by Textual itself: once Cancel pops+removes this screen,
-    # DOMNode.app raises NoActiveAppError on next access (confirmed by direct tracing —
-    # self.app.call_from_thread(...) is never even entered), so the orphaned thread's
-    # exception is silently swallowed by the @work(thread=True) worker instead of acting.
-    # This test locks in that safe behavior so a future textual upgrade that changes it
-    # gets caught here rather than surfacing as a dropped confirmation dialog in prod.
+async def test_embedding_download_modal_cancel_dismisses_false_after_failure(monkeypatch):
+    from textual import work
+    from textual.app import App
+    from textual.widgets import Button
+
+    from lsql.core import db
+    from lsql.core.exceptions import CommandError
+    from lsql.tui.widgets.embedding_model_download_modal import EmbeddingModelDownloadModal
+
+    monkeypatch.setattr(db, "get_embedding_function", lambda name: (_ for _ in ()).throw(CommandError("boom")))
+
+    class ModalHostApp(App):
+        CSS_PATH = APP_TCSS
+        result = "unset"
+
+        @work
+        async def on_mount(self) -> None:
+            self.result = await self.push_screen_wait(EmbeddingModelDownloadModal("org/model"))
+
+    def cancel_enabled():
+        buttons = app.screen.query("#embedding-modal-cancel")
+        return bool(buttons) and not buttons.first(Button).disabled
+
+    app = ModalHostApp()
+    async with app.run_test() as pilot:
+        await _wait_until(cancel_enabled, pilot)
+        await pilot.click("#embedding-modal-cancel")
+        await _wait_until(lambda: app.result is False, pilot)
+    assert app.result is False
+
+
+async def test_cancel_is_unreachable_while_load_is_still_in_flight(monkeypatch):
+    # Cancel being disabled until the load either succeeds (auto-dismisses) or fails
+    # (re-enables Retry + Cancel) isn't just the requested UX — it structurally closes
+    # an orphaned-thread risk: Screen.dismiss() -> App.pop_screen() is unconditional (no
+    # identity check against the dismissing screen), so a still-running load finishing
+    # after the user dismissed this modal some other way could in principle pop
+    # whatever now happens to be on top of the stack instead. With Cancel disabled for
+    # the modal's entire in-flight window, there is no UI path left to dismiss it while
+    # a load is still running, so that race can no longer be triggered at all.
     import threading
 
     from textual import work
     from textual.app import App
-    from textual.screen import ModalScreen
-    from textual.widgets import Label
 
     from lsql.core import db
     from lsql.tui.widgets.embedding_model_download_modal import EmbeddingModelDownloadModal
@@ -331,10 +362,6 @@ async def test_cancelled_modal_load_does_not_pop_a_later_screen(monkeypatch):
         return object()
 
     monkeypatch.setattr(db, "get_embedding_function", blocking_get)
-
-    class DummyModal(ModalScreen[bool]):
-        def compose(self):
-            yield Label("dummy", id="dummy-label")
 
     class HostApp(App):
         CSS_PATH = APP_TCSS
@@ -349,23 +376,11 @@ async def test_cancelled_modal_load_does_not_pop_a_later_screen(monkeypatch):
         async with app.run_test() as pilot:
             await _wait_until(lambda: app.screen.query("#embedding-modal-cancel"), pilot)
             await pilot.pause()
-            await pilot.click("#embedding-modal-cancel")
-            await _wait_until(lambda: app.first_result is False, pilot)
-
-            # Something else gets pushed after the cancel — the orphaned thread must
-            # not touch this when it eventually finishes.
-            app.push_screen(DummyModal())
+            # Escape is a screen-level keybinding and bypasses a disabled widget's own
+            # click-blocking, so it needs to be checked too, not just the button click.
+            await pilot.press("escape")
             await pilot.pause()
-            assert app.screen.query("#dummy-label")
-
-            release.set()  # let the cancelled modal's background load finish late
-            import asyncio
-
-            await asyncio.sleep(0.1)  # give the real OS thread a moment to actually run
-            for _ in range(10):
-                await pilot.pause()  # pump event-loop turns so its call_from_thread lands
-
-            assert app.screen.query("#dummy-label"), "orphaned thread popped an unrelated screen"
+            assert app.first_result == "unset", "Escape dismissed a modal whose load is still in flight"
     finally:
         release.set()
 
