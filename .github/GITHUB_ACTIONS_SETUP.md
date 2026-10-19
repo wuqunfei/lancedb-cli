@@ -5,15 +5,15 @@ This project includes GitHub Actions workflows to automatically build and publis
 ## Workflows
 
 ### 1. **test-build.yml** (Automatic on push/PR)
-- Runs tests on Python 3.9, 3.10, 3.11, 3.12
+- Runs tests on Python 3.10, 3.11, 3.12
 - Tests package import and help command
 - Runs on every push to `main` or `develop` branches
 - Runs on all pull requests
 
-### 2. **build-and-publish.yml** (Manual trigger on tags)
+### 2. **release.yml** (Triggered on tags)
 - Builds the package distribution
 - Validates with `twine`
-- Publishes to PyPI
+- Publishes to PyPI via [trusted publishing](https://docs.pypi.org/trusted-publishers/) (OIDC) — no API token stored in GitHub
 - Triggers automatically when you push a tag matching `v*` (e.g., `v0.1.0`)
 
 ## Setup Instructions
@@ -24,25 +24,28 @@ This project includes GitHub Actions workflows to automatically build and publis
 2. Click "Sign up" and create an account
 3. (Optional) Register your project name to reserve it
 
-### Step 2: Generate a PyPI API Token
+### Step 2: Configure a Trusted Publisher on PyPI
 
-1. Log in to PyPI
-2. Go to https://pypi.org/manage/account/
-3. Click "API tokens" in the left sidebar
-4. Click "Add API token"
-5. **Important**: 
-   - Set scope to "Entire account" (or specific to your project if available)
-   - Copy the token immediately - you won't be able to see it again
-   - Format: `pypi-AgEI...` (starts with `pypi-`)
+Trusted publishing lets PyPI verify the GitHub Actions run via OIDC instead of a long-lived API
+token.
 
-### Step 3: Add Secret to GitHub
+1. Log in to PyPI → https://pypi.org/manage/account/publishing/
+2. Add a new pending publisher (or, for an existing project, go to the project's
+   **Settings → Publishing**) with:
+   - **PyPI project name**: `lsql`
+   - **Owner**: your GitHub username/org
+   - **Repository name**: `lsql`
+   - **Workflow name**: `release.yml`
+   - **Environment name**: `pypi`
 
-1. Go to your GitHub repository
-2. Click **Settings** → **Secrets and variables** → **Actions**
-3. Click **New repository secret**
-4. Name: `PYPI_API_TOKEN`
-5. Value: Paste your PyPI token
-6. Click **Add secret**
+### Step 3: Create the `pypi` environment on GitHub
+
+1. Go to your GitHub repository → **Settings → Environments**
+2. Click **New environment**, name it `pypi`
+3. (Optional) Add protection rules — e.g. require a reviewer before a publish run proceeds
+
+No secrets are needed here — the `publish` job in `release.yml` requests a short-lived OIDC token
+(`permissions: id-token: write`) and `pypa/gh-action-pypi-publish` exchanges it with PyPI.
 
 ### Step 4: Configure your package
 
@@ -52,18 +55,6 @@ Make sure these values are updated in `pyproject.toml`:
 - `author` - Your name
 - `author_email` - Your email
 - `url` - Your GitHub repository URL
-
-### Step 5: First Publish
-
-To manually publish without waiting for a tag:
-
-```bash
-# Build locally
-python -m build
-
-# Upload (requires PyPI token or credentials)
-twine upload dist/*
-```
 
 ## Publishing a New Release
 
@@ -83,7 +74,7 @@ git push origin v0.2.0
 The GitHub Action will automatically:
 - ✅ Build the package
 - ✅ Validate it with twine
-- ✅ Upload to PyPI
+- ✅ Upload to PyPI via trusted publishing
 - ✅ Create a GitHub Release (optional - requires permissions)
 
 ## Verification
@@ -98,18 +89,14 @@ Check PyPI: https://pypi.org/project/lsql/
 
 ## Troubleshooting
 
-### "PYPI_API_TOKEN not found"
-- Verify the secret exists in Settings → Secrets
-- Check the secret name is exactly `PYPI_API_TOKEN`
-- Ensure it's in the correct repository
-
-### "Invalid token format"
-- PyPI tokens should start with `pypi-`
-- Copy the full token from PyPI account page
-- Don't include quotes or spaces
+### "Trusted publishing exchange failure" / 403 from PyPI
+- Double-check the PyPI trusted publisher's **owner**, **repository**, **workflow filename**
+  (`release.yml`), and **environment name** (`pypi`) match exactly
+- Make sure the `publish` job still has `environment: pypi` and `permissions: id-token: write`
+- Confirm the `pypi` environment exists under repo **Settings → Environments**
 
 ### "Package already exists"
-- The workflow uses `--skip-existing` flag
+- The workflow uses `skip-existing: true`
 - You can't overwrite an existing version
 - Increment the version number for new releases
 
@@ -120,35 +107,20 @@ Check PyPI: https://pypi.org/project/lsql/
 
 ## Advanced: Test PyPI (Staging)
 
-To test before publishing to production PyPI:
-
-1. Create account on https://test.pypi.org/
-2. Generate API token on test.pypi.org
-3. Add another secret: `TEST_PYPI_API_TOKEN`
-4. Create `test-publish.yml` workflow with:
-
-```yaml
-env:
-  TWINE_REPOSITORY: testpypi
-  TWINE_PASSWORD: ${{ secrets.TEST_PYPI_API_TOKEN }}
-```
-
-Then test with:
-```bash
-pip install -i https://test.pypi.org/simple/ lsql
-```
+Trusted publishing also works against https://test.pypi.org/ — register a separate trusted
+publisher there pointing at the same repo/workflow, then add a `test-publish.yml` workflow whose
+publish job targets a `testpypi` environment and passes `repository-url:
+https://test.pypi.org/legacy/` to `pypa/gh-action-pypi-publish`.
 
 ## Security Notes
 
-- Never commit your PyPI token to the repository
-- Use repository secrets for sensitive data
-- Consider using organization-level secrets for shared tokens
-- Rotate tokens periodically
-- Use specific project-scoped tokens if PyPI offers them
+- No PyPI token is stored in this repository — publishing relies on short-lived OIDC credentials
+  scoped to the `release.yml` workflow and the `pypi` environment
+- Consider adding required reviewers to the `pypi` environment to gate publishes manually
 
 ## More Information
 
-- [PyPI Help](https://pypi.org/help/)
+- [PyPI Trusted Publishers](https://docs.pypi.org/trusted-publishers/)
 - [GitHub Actions Documentation](https://docs.github.com/en/actions)
 - [twine Documentation](https://twine.readthedocs.io/)
 - [Python Packaging Guide](https://packaging.python.org/)
