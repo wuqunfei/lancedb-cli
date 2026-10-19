@@ -132,7 +132,7 @@ COMMANDS = {
         help_text="Refresh the table list and SQL views",
     ),
     "exit": CommandSpec(
-        "exit", handlers.cmd_exit, parser.build_exit_parser, needs_table=False, help_text="Exit lsql"
+        "exit", handlers.cmd_exit, parser.build_exit_parser, needs_table=False, help_text="Exit dbx"
     ),
 }
 

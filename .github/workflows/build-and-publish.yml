@@ -33,7 +33,7 @@ jobs:
         python -m venv /tmp/wheel-check
         /tmp/wheel-check/bin/pip install --upgrade pip
         /tmp/wheel-check/bin/pip install dist/*.whl
-        /tmp/wheel-check/bin/lsql --help > /dev/null && echo "✓ lsql --help works from installed wheel"
+        /tmp/wheel-check/bin/dbx --help > /dev/null && echo "✓ dbx --help works from installed wheel"
         /tmp/wheel-check/bin/python -c "import lancedbx, pathlib; css = pathlib.Path(lancedbx.__file__).parent / 'tui' / 'app.tcss'; assert css.exists(), f'{css} missing from installed wheel'; print('✓ tui/app.tcss packaged correctly')"
 
     - name: Upload artifacts
