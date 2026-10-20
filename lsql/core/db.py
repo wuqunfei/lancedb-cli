@@ -45,6 +45,15 @@ def get_schema(conn: lancedb.DBConnection, table_name: str) -> Any:
     return open_table(conn, table_name).schema
 
 
+def _apply_select(df: pd.DataFrame, select: Optional[str]) -> pd.DataFrame:
+    """Narrow `df` to a comma-separated column list, silently dropping any names not
+    present (shared by query_table and search_table)."""
+    if not select:
+        return df
+    cols = [c.strip() for c in select.split(",")]
+    return df[[c for c in cols if c in df.columns]]
+
+
 def query_table(
     conn: lancedb.DBConnection,
     table_name: str,
@@ -66,11 +75,7 @@ def query_table(
     if limit and len(results) > limit:
         results = results.head(limit)
 
-    if select:
-        cols = [c.strip() for c in select.split(",")]
-        results = results[[c for c in cols if c in results.columns]]
-
-    return results
+    return _apply_select(results, select)
 
 
 def refresh_sql_views(conn: lancedb.DBConnection) -> None:
@@ -383,10 +388,21 @@ def search_table(
     needs_vector = mode in ("vector", "hybrid")
     needs_text = mode in ("fts", "hybrid")
 
-    vec = None
+    # Cheap validation (schema/column checks) runs before any expensive work — notably
+    # before get_embedding_function, which can trigger a multi-hundred-MB model
+    # download on first use. A missing/typo'd --text-column shouldn't cost that.
     resolved_vector_col = None
     if needs_vector:
         resolved_vector_col = _resolve_vector_column(tbl, vector_column)
+
+    if needs_text:
+        if not text_column:
+            raise CommandError("--text-column is required for fts/hybrid search")
+        if text_column not in tbl.schema.names:
+            raise CommandError(f"Column '{text_column}' not found in table '{table_name}'")
+
+    vec = None
+    if needs_vector:
         embed_fn = get_embedding_function(model_name)
         try:
             vec = np.asarray(embed_fn.generate_embeddings([query])[0], dtype=np.float32)
@@ -394,10 +410,6 @@ def search_table(
             raise CommandError(f"Could not embed query: {e}")
 
     if needs_text:
-        if not text_column:
-            raise CommandError("--text-column is required for fts/hybrid search")
-        if text_column not in tbl.schema.names:
-            raise CommandError(f"Column '{text_column}' not found in table '{table_name}'")
         if not has_fts_index(tbl, text_column):
             create_fts_index(conn, table_name, text_column)
             tbl = open_table(conn, table_name)
@@ -419,8 +431,4 @@ def search_table(
     except Exception as e:
         raise CommandError(f"Search failed: {e}")
 
-    if select:
-        cols = [c.strip() for c in select.split(",")]
-        results = results[[c for c in cols if c in results.columns]]
-
-    return results
+    return _apply_select(results, select)

@@ -77,6 +77,30 @@ def test_query_table_select(people):
     assert list(result.columns) == ["name", "age"]
 
 
+def test_apply_select_filters_and_strips_whitespace():
+    import pandas as pd
+
+    df = pd.DataFrame({"name": ["a"], "age": [1], "city": ["x"]})
+    result = db._apply_select(df, "name, age")
+    assert list(result.columns) == ["name", "age"]
+
+
+def test_apply_select_drops_unknown_columns():
+    import pandas as pd
+
+    df = pd.DataFrame({"name": ["a"]})
+    result = db._apply_select(df, "name,nope")
+    assert list(result.columns) == ["name"]
+
+
+def test_apply_select_none_returns_unchanged():
+    import pandas as pd
+
+    df = pd.DataFrame({"name": ["a"], "age": [1]})
+    result = db._apply_select(df, None)
+    assert list(result.columns) == ["name", "age"]
+
+
 def test_run_sql_across_tables(people):
     db.load_csv(people, str(SAMPLE_CSV), "people_copy")
     result = db.run_sql(people, "SELECT count(*) AS n FROM people")
@@ -376,6 +400,23 @@ def test_search_hybrid_mode_requires_text_column(people, fake_embedding):
     db.embed_table(people, "people", ["name"], ["vector"])
     with pytest.raises(CommandError, match="--text-column"):
         db.search_table(people, "people", mode="hybrid", query="New York")
+
+
+def test_search_hybrid_mode_validates_text_column_before_embedding(people, monkeypatch):
+    # Regression test: --text-column's presence/existence must be checked BEFORE the
+    # (expensive, first-use-downloads-a-model) query embedding happens — a missing
+    # --text-column is a cheap, instant mistake that shouldn't cost a model load.
+    db.embed_table(people, "people", ["name"], ["vector"])
+    calls = []
+    monkeypatch.setattr(db, "get_embedding_function", lambda name: calls.append(name))
+
+    with pytest.raises(CommandError, match="--text-column"):
+        db.search_table(people, "people", mode="hybrid", query="New York")
+    assert calls == []
+
+    with pytest.raises(CommandError, match="not found"):
+        db.search_table(people, "people", mode="hybrid", query="New York", text_column="nope")
+    assert calls == []
 
 
 def test_search_hybrid_mode_returns_results(people, fake_embedding):

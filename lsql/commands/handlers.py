@@ -85,6 +85,9 @@ def cmd_embedding(state: AppState, args: argparse.Namespace) -> r.CommandResult:
         model_name=model_name,
         overwrite=args.overwrite,
     )
+    # So a later /search with no --model picks up whatever model actually built these
+    # vectors, even if it was set here via --model directly rather than the panel.
+    state.current_embedding_model = model_name
     pairs = ", ".join(f"{s}->{t}" for s, t in zip(source_cols, target_cols))
     return r.ok_text(
         rendering.format_status(

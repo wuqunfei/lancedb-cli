@@ -205,6 +205,19 @@ def test_embedding_falls_back_to_default_model(state, fake_embedding):
     assert fake_embedding == [db.DEFAULT_EMBEDDING_MODEL]
 
 
+def test_embedding_updates_state_current_model_so_search_matches(state, fake_embedding):
+    # Regression test: running /embedding --model directly (never touching the
+    # Embedding Model panel) must make /search's default --model fallback match the
+    # model that actually built the vectors — otherwise a later /search with no
+    # --model silently embeds the query with a stale/different model and dimension
+    # mismatches against the real vector column.
+    run(state, "/embedding --table people --source name --model org/explicit-model")
+    assert state.current_embedding_model == "org/explicit-model"
+
+    run(state, "/search --mode vector --query hello")
+    assert fake_embedding[-1] == "org/explicit-model"
+
+
 def test_embedding_multi_column(state, fake_embedding):
     result = run(state, "/embedding --table people --source name,city")
     assert result.kind == "text"
