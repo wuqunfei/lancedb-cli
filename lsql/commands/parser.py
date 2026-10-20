@@ -136,23 +136,53 @@ def build_index_parser() -> SilentArgumentParser:
     return p
 
 
-def build_search_parser() -> SilentArgumentParser:
-    p = _new_parser("search")
-    p.add_argument("--mode", required=True, choices=["vector", "fts", "hybrid"], help="Search mode")
-    p.add_argument("--query", required=True, help="Search query (embedded for vector/hybrid, keyword for fts/hybrid)")
+def build_search_vector_parser() -> SilentArgumentParser:
+    p = _new_parser("search-vector")
+    p.add_argument("--query", required=True, help="Search query, embedded with the current embedding model")
     p.add_argument(
         "--vector-column",
         default=None,
         dest="vector_column",
-        help="Vector column to search (vector/hybrid). Auto-inferred if the table has exactly one",
+        help="Vector column to search. Auto-inferred if the table has exactly one",
+    )
+    p.add_argument("--model", default=None, help="sentence-transformers model name")
+    p.add_argument("--limit", type=int, default=10, help="Number of rows to return")
+    p.add_argument("--where", default=None, help="WHERE clause filter (SQL syntax)")
+    p.add_argument("--select", default=None, help="Columns to select (comma-separated)")
+    return p
+
+
+def build_search_fts_parser() -> SilentArgumentParser:
+    p = _new_parser("search-fts")
+    p.add_argument("--query", required=True, help="Keyword search query")
+    p.add_argument(
+        "--text-column",
+        required=True,
+        dest="text_column",
+        help="Text column to search — auto-creates its FTS index on first use",
+    )
+    p.add_argument("--limit", type=int, default=10, help="Number of rows to return")
+    p.add_argument("--where", default=None, help="WHERE clause filter (SQL syntax)")
+    p.add_argument("--select", default=None, help="Columns to select (comma-separated)")
+    return p
+
+
+def build_search_hybrid_parser() -> SilentArgumentParser:
+    p = _new_parser("search-hybrid")
+    p.add_argument("--query", required=True, help="Search query (embedded for vector half, keyword for text half)")
+    p.add_argument(
+        "--vector-column",
+        default=None,
+        dest="vector_column",
+        help="Vector column to search. Auto-inferred if the table has exactly one",
     )
     p.add_argument(
         "--text-column",
-        default=None,
+        required=True,
         dest="text_column",
-        help="Text column to search (fts/hybrid) — required, auto-creates its FTS index on first use",
+        help="Text column to search — auto-creates its FTS index on first use",
     )
-    p.add_argument("--model", default=None, help="sentence-transformers model name for vector/hybrid search")
+    p.add_argument("--model", default=None, help="sentence-transformers model name for the vector half")
     p.add_argument("--limit", type=int, default=10, help="Number of rows to return")
     p.add_argument("--where", default=None, help="WHERE clause filter (SQL syntax)")
     p.add_argument("--select", default=None, help="Columns to select (comma-separated)")

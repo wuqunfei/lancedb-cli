@@ -207,14 +207,14 @@ def test_embedding_falls_back_to_default_model(state, fake_embedding):
 
 def test_embedding_updates_state_current_model_so_search_matches(state, fake_embedding):
     # Regression test: running /embedding --model directly (never touching the
-    # Embedding Model panel) must make /search's default --model fallback match the
-    # model that actually built the vectors — otherwise a later /search with no
-    # --model silently embeds the query with a stale/different model and dimension
+    # Embedding Model panel) must make /search-vector's default --model fallback match
+    # the model that actually built the vectors — otherwise a later /search-vector with
+    # no --model silently embeds the query with a stale/different model and dimension
     # mismatches against the real vector column.
     run(state, "/embedding --table people --source name --model org/explicit-model")
     assert state.current_embedding_model == "org/explicit-model"
 
-    run(state, "/search --mode vector --query hello")
+    run(state, "/search-vector --query hello")
     assert fake_embedding[-1] == "org/explicit-model"
 
 
@@ -247,13 +247,13 @@ def test_index_missing_column_is_an_error_not_a_crash(state):
 
 def test_search_vector_mode_returns_dataframe(state, fake_embedding):
     run(state, "/embedding --table people --source name")
-    result = run(state, "/search --mode vector --query hello")
+    result = run(state, "/search-vector --query hello")
     assert result.kind == "dataframe"
     assert len(result.dataframe) > 0
 
 
 def test_search_fts_mode_auto_creates_index_and_returns_dataframe(state):
-    result = run(state, "/search --mode fts --query 'New York' --text-column city")
+    result = run(state, "/search-fts --query 'New York' --text-column city")
     assert result.kind == "dataframe"
     tbl = db.open_table(state.connection, "people")
     assert db.has_fts_index(tbl, "city") is True
@@ -261,28 +261,29 @@ def test_search_fts_mode_auto_creates_index_and_returns_dataframe(state):
 
 def test_search_hybrid_mode_returns_dataframe(state, fake_embedding):
     run(state, "/embedding --table people --source name")
-    result = run(state, "/search --mode hybrid --query 'New York' --text-column city")
+    result = run(state, "/search-hybrid --query 'New York' --text-column city")
     assert result.kind == "dataframe"
 
 
 def test_search_no_results_is_text_not_error(state, fake_embedding):
     run(state, "/embedding --table people --source name")
-    result = run(state, "/search --mode fts --query zzzznotfound --text-column city")
+    result = run(state, "/search-fts --query zzzznotfound --text-column city")
     assert result.kind == "text"
 
 
 def test_search_requires_current_table(state):
     state.current_table = None
-    result = registry.prepare(state, "/search --mode vector --query hello")
+    result = registry.prepare(state, "/search-vector --query hello")
     assert result.kind == "error"
 
 
 def test_search_uses_explicit_model_flag(state, fake_embedding):
     run(state, "/embedding --table people --source name")
-    run(state, "/search --mode vector --query hello --model org/explicit-model")
+    run(state, "/search-vector --query hello --model org/explicit-model")
     assert "org/explicit-model" in fake_embedding
 
 
-def test_search_bad_mode_is_an_error_not_a_crash(state):
-    result = registry.prepare(state, "/search --mode nope --query hello")
+def test_old_search_command_is_removed(state):
+    result = registry.prepare(state, "/search --mode vector --query hello")
     assert result.kind == "error"
+    assert "Unknown command" in str(result.renderable)

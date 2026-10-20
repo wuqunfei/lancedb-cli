@@ -138,13 +138,25 @@ COMMANDS = {
         parser.build_index_parser,
         help_text="Build a full-text index on a column of the current table (--column)",
     ),
-    "search": CommandSpec(
-        "search",
-        handlers.cmd_search,
-        parser.build_search_parser,
+    "search-vector": CommandSpec(
+        "search-vector",
+        handlers.cmd_search_vector,
+        parser.build_search_vector_parser,
+        help_text="kNN vector search on the current table (--query ... [--vector-column/--model/--limit/--where/--select])",
+    ),
+    "search-fts": CommandSpec(
+        "search-fts",
+        handlers.cmd_search_fts,
+        parser.build_search_fts_parser,
+        help_text="Full-text keyword search on the current table (--query ... --text-column ... [--limit/--where/--select])",
+    ),
+    "search-hybrid": CommandSpec(
+        "search-hybrid",
+        handlers.cmd_search_hybrid,
+        parser.build_search_hybrid_parser,
         help_text=(
-            "Search the current table (--mode vector|fts|hybrid --query ... "
-            "[--vector-column/--text-column/--model/--limit/--where/--select])"
+            "Vector + full-text hybrid search on the current table (--query ... --text-column ... "
+            "[--vector-column/--model/--limit/--where/--select])"
         ),
     ),
     "dump": CommandSpec(

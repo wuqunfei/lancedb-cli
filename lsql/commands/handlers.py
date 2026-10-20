@@ -104,12 +104,46 @@ def cmd_index(state: AppState, args: argparse.Namespace) -> r.CommandResult:
     )
 
 
-def cmd_search(state: AppState, args: argparse.Namespace) -> r.CommandResult:
+def cmd_search_vector(state: AppState, args: argparse.Namespace) -> r.CommandResult:
     model_name = args.model or state.current_embedding_model or db.DEFAULT_EMBEDDING_MODEL
     df = db.search_table(
         state.connection,
         state.current_table,
-        mode=args.mode,
+        mode="vector",
+        query=args.query,
+        vector_column=args.vector_column,
+        model_name=model_name,
+        limit=args.limit,
+        where=args.where,
+        select=args.select,
+    )
+    if len(df) == 0:
+        return r.ok_text(rendering.format_status("No results", style="red"))
+    return r.ok_dataframe(df, title=f"Search results from '{state.current_table}' (vector)")
+
+
+def cmd_search_fts(state: AppState, args: argparse.Namespace) -> r.CommandResult:
+    df = db.search_table(
+        state.connection,
+        state.current_table,
+        mode="fts",
+        query=args.query,
+        text_column=args.text_column,
+        limit=args.limit,
+        where=args.where,
+        select=args.select,
+    )
+    if len(df) == 0:
+        return r.ok_text(rendering.format_status("No results", style="red"))
+    return r.ok_dataframe(df, title=f"Search results from '{state.current_table}' (fts)")
+
+
+def cmd_search_hybrid(state: AppState, args: argparse.Namespace) -> r.CommandResult:
+    model_name = args.model or state.current_embedding_model or db.DEFAULT_EMBEDDING_MODEL
+    df = db.search_table(
+        state.connection,
+        state.current_table,
+        mode="hybrid",
         query=args.query,
         vector_column=args.vector_column,
         text_column=args.text_column,
@@ -120,7 +154,7 @@ def cmd_search(state: AppState, args: argparse.Namespace) -> r.CommandResult:
     )
     if len(df) == 0:
         return r.ok_text(rendering.format_status("No results", style="red"))
-    return r.ok_dataframe(df, title=f"Search results from '{state.current_table}' ({args.mode})")
+    return r.ok_dataframe(df, title=f"Search results from '{state.current_table}' (hybrid)")
 
 
 def cmd_dump(state: AppState, args: argparse.Namespace) -> r.CommandResult:

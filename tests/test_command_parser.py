@@ -7,7 +7,9 @@ from lsql.commands.parser import (
     build_index_parser,
     build_load_parser,
     build_query_parser,
-    build_search_parser,
+    build_search_fts_parser,
+    build_search_hybrid_parser,
+    build_search_vector_parser,
     split_first_token,
     tokenize_rest,
 )
@@ -116,35 +118,69 @@ def test_index_parser_requires_column():
     assert args.column == "bio"
 
 
-def test_search_parser_requires_mode_and_query():
+def test_search_vector_parser_requires_query():
     with pytest.raises(ArgParseExit):
-        build_search_parser().parse_args(["--query", "hello"])
-    with pytest.raises(ArgParseExit):
-        build_search_parser().parse_args(["--mode", "vector"])
-    args = build_search_parser().parse_args(["--mode", "vector", "--query", "hello"])
-    assert args.mode == "vector"
+        build_search_vector_parser().parse_args([])
+    args = build_search_vector_parser().parse_args(["--query", "hello"])
     assert args.query == "hello"
 
 
-def test_search_parser_rejects_bad_mode_choice():
-    with pytest.raises(ArgParseExit):
-        build_search_parser().parse_args(["--mode", "nope", "--query", "hello"])
-
-
-def test_search_parser_defaults():
-    args = build_search_parser().parse_args(["--mode", "fts", "--query", "hello"])
+def test_search_vector_parser_defaults():
+    args = build_search_vector_parser().parse_args(["--query", "hello"])
     assert args.vector_column is None
-    assert args.text_column is None
     assert args.model is None
     assert args.limit == 10
     assert args.where is None
     assert args.select is None
 
 
-def test_search_parser_parses_all_flags():
-    args = build_search_parser().parse_args(
+def test_search_vector_parser_parses_all_flags():
+    args = build_search_vector_parser().parse_args(
         [
-            "--mode", "hybrid",
+            "--query", "hello world",
+            "--vector-column", "bio_vector",
+            "--model", "org/model",
+            "--limit", "5",
+            "--where", "age > 21",
+            "--select", "name,bio",
+        ]
+    )
+    assert args.query == "hello world"
+    assert args.vector_column == "bio_vector"
+    assert args.model == "org/model"
+    assert args.limit == 5
+    assert args.where == "age > 21"
+    assert args.select == "name,bio"
+
+
+def test_search_fts_parser_requires_query_and_text_column():
+    with pytest.raises(ArgParseExit):
+        build_search_fts_parser().parse_args(["--query", "hello"])
+    with pytest.raises(ArgParseExit):
+        build_search_fts_parser().parse_args(["--text-column", "bio"])
+    args = build_search_fts_parser().parse_args(["--query", "hello", "--text-column", "bio"])
+    assert args.query == "hello"
+    assert args.text_column == "bio"
+
+
+def test_search_fts_parser_defaults():
+    args = build_search_fts_parser().parse_args(["--query", "hello", "--text-column", "bio"])
+    assert args.limit == 10
+    assert args.where is None
+    assert args.select is None
+
+
+def test_search_hybrid_parser_requires_query_and_text_column():
+    with pytest.raises(ArgParseExit):
+        build_search_hybrid_parser().parse_args(["--query", "hello"])
+    args = build_search_hybrid_parser().parse_args(["--query", "hello", "--text-column", "bio"])
+    assert args.query == "hello"
+    assert args.text_column == "bio"
+
+
+def test_search_hybrid_parser_parses_all_flags():
+    args = build_search_hybrid_parser().parse_args(
+        [
             "--query", "hello world",
             "--vector-column", "bio_vector",
             "--text-column", "bio",
@@ -154,7 +190,6 @@ def test_search_parser_parses_all_flags():
             "--select", "name,bio",
         ]
     )
-    assert args.mode == "hybrid"
     assert args.query == "hello world"
     assert args.vector_column == "bio_vector"
     assert args.text_column == "bio"

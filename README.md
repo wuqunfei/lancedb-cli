@@ -25,10 +25,11 @@ more retyping paths and table names for every single query.
 - 🧮 **Raw SQL via DuckDB** — `/sql` runs across every table in the database
 - 🧬 **Embeddings** — set a sentence-transformers model in the Embedding Model panel
   (downloading it on first use), then `/embedding` computes vector column(s) for a table
-- 🔎 **Vector, full-text, and hybrid search** — `/search` runs a kNN vector search, a
-  keyword full-text search, or both combined (LanceDB's default RRF reranker) against
-  the current table; `/index` builds the full-text index `/search` needs, or it's built
-  for you automatically on first use
+- 🔎 **Vector, full-text, and hybrid search** — `/search-vector` runs a kNN vector
+  search, `/search-fts` a keyword full-text search, and `/search-hybrid` both combined
+  (LanceDB's default RRF reranker) against the current table; `/index` builds the
+  full-text index `/search-fts`/`/search-hybrid` need, or it's built for you
+  automatically on first use
 - 🛟 **Confirmation dialogs** — `/drop`, `/empty`, `/delete`, and `/embedding` always ask first
 - ⏪ **Command history** — up/down arrow recall, just like a shell
 - 📚 **Built-in help** — `/help` lists every command; `/help <command>` shows its flags
@@ -101,8 +102,9 @@ text, copy it, or edit it and write the change back to the table:
 
 ![cell detail popup screenshot](https://raw.githubusercontent.com/wuqunfei/lsql/main/docs/screenshots/09-cell-detail.svg)
 
-`/search` runs vector, full-text, or hybrid search against the current table — here's
-`/search --mode hybrid --query "remember to buy groceries" --text-column note` against a
+`/search-vector`, `/search-fts`, and `/search-hybrid` run vector, full-text, or hybrid
+search against the current table — here's
+`/search-hybrid --query "remember to buy groceries" --text-column note` against a
 table of unrelated notes, finding the shopping-list one even though "groceries" never
 appears verbatim:
 
@@ -113,8 +115,9 @@ appears verbatim:
 ## ⌨️ Command reference
 
 Commands that operate on a table (`query`, `schema`, `delete`, `empty`, `drop`, `update`,
-`dump`, `index`, `search`) always act on whichever table is currently selected in the
-table list — select it there rather than naming it in the command.
+`dump`, `index`, `search-vector`, `search-fts`, `search-hybrid`) always act on whichever
+table is currently selected in the table list — select it there rather than naming it in
+the command.
 
 | Command | What it does |
 |---|---|
@@ -129,7 +132,9 @@ table list — select it there rather than naming it in the command.
 | `/load --path file.csv --table name [--overwrite]` | Load a CSV into a new table |
 | `/embedding --table name --source col[,col2] [--target vec[,vec2]] [--model org/name] [--overwrite]` | Compute embeddings for one or more columns into vector column(s) |
 | `/index --column name` | Build a full-text index on a column of the current table |
-| `/search --mode vector\|fts\|hybrid --query "..." [--vector-column c] [--text-column c] [--model org/name] [--limit 10] [--where ...] [--select "a,b"]` | Vector, full-text, or hybrid search against the current table |
+| `/search-vector --query "..." [--vector-column c] [--model org/name] [--limit 10] [--where ...] [--select "a,b"]` | kNN vector search against the current table |
+| `/search-fts --query "..." --text-column c [--limit 10] [--where ...] [--select "a,b"]` | Keyword full-text search against the current table |
+| `/search-hybrid --query "..." --text-column c [--vector-column c] [--model org/name] [--limit 10] [--where ...] [--select "a,b"]` | Vector + full-text hybrid search against the current table |
 | `/dump --path out.csv [--overwrite]` | Dump the current table to CSV |
 | `/refresh` | Refresh the table list and SQL views |
 | `/help [command]` | Show all commands, or details for one |
@@ -147,14 +152,14 @@ currently selected.
 With multiple `--source` columns and no `--target`, each gets its own `<source>_vector`
 column.
 
-`/search --mode vector` embeds `--query` with the same model precedence as `/embedding`
-and runs an exact kNN scan — no index required. `--vector-column` is only needed if the
-table has more than one vector column (from repeated `/embedding` runs); with exactly
-one, it's picked automatically. `--mode fts` keyword-searches `--text-column` (required
-— there's no single obvious text column to default to), building its full-text index
-automatically on first use if one doesn't exist yet (same as running `/index --column`
-on it beforehand). `--mode hybrid` runs both and combines them with LanceDB's default
-RRF reranker, so it needs both a vector column (inferred or explicit) and `--text-column`.
+`/search-vector` embeds `--query` with the same model precedence as `/embedding` and runs
+an exact kNN scan — no index required. `--vector-column` is only needed if the table has
+more than one vector column (from repeated `/embedding` runs); with exactly one, it's
+picked automatically. `/search-fts` keyword-searches `--text-column` (required — there's
+no single obvious text column to default to), building its full-text index automatically
+on first use if one doesn't exist yet (same as running `/index --column` on it
+beforehand). `/search-hybrid` runs both and combines them with LanceDB's default RRF
+reranker, so it needs both a vector column (inferred or explicit) and `--text-column`.
 
 ---
 

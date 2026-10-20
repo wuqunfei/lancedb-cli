@@ -184,7 +184,7 @@ async def scenario_search(tmp_path: Path) -> None:
 
         await pilot.click("#command-input")
         inp.value = ""
-        for ch in '/search --mode hybrid --query "remember to buy groceries" --text-column note':
+        for ch in '/search-hybrid --query "remember to buy groceries" --text-column note':
             await pilot.press(ch)
         await pilot.press("enter")
         await pilot.pause(0.5)
