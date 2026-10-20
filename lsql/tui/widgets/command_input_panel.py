@@ -144,6 +144,12 @@ class CommandInputPanel(Vertical):
         command_input.reset_history_cursor()
         self.query_one("#command-suggestions", OptionList).display = False
 
+    def finish_submit(self) -> None:
+        """Called after a command is submitted — unlike clear_input(), leaves the
+        just-run command line visible in the input instead of blanking it."""
+        self.query_one("#command-input", HistoryInput).reset_history_cursor()
+        self.query_one("#command-suggestions", OptionList).display = False
+
     def focus_input(self) -> None:
         self.query_one("#command-input", HistoryInput).focus()
 

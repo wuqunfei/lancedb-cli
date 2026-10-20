@@ -336,3 +336,88 @@ CellDetailModal {
     padding: 0 1;
     margin-left: 2;
 }
+
+ConnectModal {
+    align: center middle;
+}
+
+#connect-dialog {
+    width: 90;
+    height: 32;
+    padding: 1 2;
+    border: thick $primary;
+    background: $surface;
+}
+
+#connect-tabs {
+    height: 1fr;
+}
+
+#connect-local-header {
+    height: 1;
+}
+
+#connect-local-title {
+    height: 1;
+    text-style: bold;
+    content-align: left middle;
+    margin-left: 2;
+}
+
+#connect-local-up {
+    height: 1;
+    min-width: 0;
+    border: none;
+    padding: 0 1;
+}
+
+#connect-local-tree {
+    height: 1fr;
+    margin-top: 1;
+}
+
+#connect-local-selected-path {
+    height: 1;
+    margin-top: 1;
+    color: $text-muted;
+}
+
+#connect-os-fields {
+    height: auto;
+    margin-top: 1;
+}
+
+#connect-recents {
+    height: 7;
+    margin-top: 1;
+    border-top: solid $primary-darken-1;
+}
+
+#connect-recent-list {
+    height: 1fr;
+}
+
+#connect-error {
+    height: auto;
+    color: $error;
+    margin-top: 1;
+}
+
+#connect-buttons {
+    height: auto;
+    margin-top: 1;
+    align: right middle;
+}
+
+#connect-spinner {
+    width: 3;
+    margin-right: 1;
+}
+
+#connect-confirm, #connect-cancel {
+    height: 1;
+    min-width: 0;
+    border: none;
+    padding: 0 1;
+    margin-left: 2;
+}

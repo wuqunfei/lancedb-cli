@@ -1,6 +1,8 @@
+import json
 from unittest.mock import patch
 
-from lsql.persistence import CommandHistory, LastEmbeddingModel, RecentDatabases, default_config_dir
+from lsql.core.connection import ConnectionRequest
+from lsql.persistence import CommandHistory, ConnectionEntry, ConnectionHistory, LastEmbeddingModel, default_config_dir
 
 
 def test_default_config_dir_migrates_old_directory(tmp_path):
@@ -57,38 +59,91 @@ def test_default_config_dir_with_no_old_dir(tmp_path):
     assert config_dir == home / ".config" / "lsql"
 
 
-def test_recent_databases_empty_by_default(tmp_path):
-    rd = RecentDatabases(path=tmp_path / "recent.json")
-    assert rd.load() == []
+def test_connection_history_empty_by_default(tmp_path):
+    ch = ConnectionHistory(path=tmp_path / "recent.json")
+    assert ch.load() == []
 
 
-def test_recent_databases_add_puts_most_recent_first(tmp_path):
-    rd = RecentDatabases(path=tmp_path / "recent.json")
-    rd.add("/db/a")
-    rd.add("/db/b")
-    assert rd.load() == ["/db/b", "/db/a"]
+def test_connection_history_add_puts_most_recent_first(tmp_path):
+    ch = ConnectionHistory(path=tmp_path / "recent.json")
+    ch.add("/db/a")
+    ch.add("/db/b")
+    assert ch.load() == [
+        ConnectionEntry(kind="local", uri="/db/b"),
+        ConnectionEntry(kind="local", uri="/db/a"),
+    ]
 
 
-def test_recent_databases_add_dedupes_and_moves_to_front(tmp_path):
-    rd = RecentDatabases(path=tmp_path / "recent.json")
-    rd.add("/db/a")
-    rd.add("/db/b")
-    rd.add("/db/a")
-    assert rd.load() == ["/db/a", "/db/b"]
+def test_connection_history_add_dedupes_and_moves_to_front(tmp_path):
+    ch = ConnectionHistory(path=tmp_path / "recent.json")
+    ch.add("/db/a")
+    ch.add("/db/b")
+    ch.add("/db/a")
+    assert ch.load() == [
+        ConnectionEntry(kind="local", uri="/db/a"),
+        ConnectionEntry(kind="local", uri="/db/b"),
+    ]
 
 
-def test_recent_databases_caps_to_max_items(tmp_path):
-    rd = RecentDatabases(path=tmp_path / "recent.json", max_items=2)
-    rd.add("/db/a")
-    rd.add("/db/b")
-    rd.add("/db/c")
-    assert rd.load() == ["/db/c", "/db/b"]
+def test_connection_history_caps_to_max_items(tmp_path):
+    ch = ConnectionHistory(path=tmp_path / "recent.json", max_items=2)
+    ch.add("/db/a")
+    ch.add("/db/b")
+    ch.add("/db/c")
+    assert ch.load() == [
+        ConnectionEntry(kind="local", uri="/db/c"),
+        ConnectionEntry(kind="local", uri="/db/b"),
+    ]
 
 
-def test_recent_databases_persists_across_instances(tmp_path):
+def test_connection_history_persists_across_instances(tmp_path):
     path = tmp_path / "recent.json"
-    RecentDatabases(path=path).add("/db/a")
-    assert RecentDatabases(path=path).load() == ["/db/a"]
+    ConnectionHistory(path=path).add("/db/a")
+    assert ConnectionHistory(path=path).load() == [ConnectionEntry(kind="local", uri="/db/a")]
+
+
+def test_connection_history_loads_old_bare_string_format(tmp_path):
+    path = tmp_path / "recent.json"
+    path.write_text(json.dumps(["/db/a"]))
+    assert ConnectionHistory(path=path).load() == [ConnectionEntry(kind="local", uri="/db/a")]
+
+
+def test_connection_history_add_object_storage_entry_roundtrips_without_secrets(tmp_path):
+    path = tmp_path / "recent.json"
+    ch = ConnectionHistory(path=path)
+    ch.add(
+        ConnectionRequest(
+            kind="object_storage",
+            uri="s3://bucket/path",
+            provider="s3",
+            storage_options={"aws_access_key_id": "AKIA123", "aws_secret_access_key": "s3cr3t"},
+        )
+    )
+    raw = path.read_text()
+    assert "AKIA123" not in raw
+    assert "s3cr3t" not in raw
+    assert ch.load() == [ConnectionEntry(kind="object_storage", uri="s3://bucket/path", provider="s3")]
+
+
+def test_connection_history_add_cloud_entry_persists_region_and_host_override_not_api_key(tmp_path):
+    path = tmp_path / "recent.json"
+    ch = ConnectionHistory(path=path)
+    ch.add(
+        ConnectionRequest(
+            kind="cloud",
+            uri="db://mydb",
+            api_key="ldb_super_secret",
+            region="us-west-2",
+            host_override="https://custom.example.com",
+        )
+    )
+    raw = path.read_text()
+    assert "ldb_super_secret" not in raw
+    assert ch.load() == [
+        ConnectionEntry(
+            kind="cloud", uri="db://mydb", region="us-west-2", host_override="https://custom.example.com"
+        )
+    ]
 
 
 def test_command_history_empty_by_default(tmp_path):
@@ -121,7 +176,7 @@ def test_command_history_caps_to_max_items(tmp_path):
 def test_load_ignores_corrupt_file(tmp_path):
     path = tmp_path / "recent.json"
     path.write_text("not json")
-    assert RecentDatabases(path=path).load() == []
+    assert ConnectionHistory(path=path).load() == []
 
 
 def test_last_embedding_model_empty_by_default(tmp_path):

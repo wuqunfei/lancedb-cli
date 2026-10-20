@@ -14,6 +14,7 @@ class AppState:
 
     connection: Any = None
     current_db_path: Optional[str] = None
+    current_connection_kind: str = "local"  # "local" | "object_storage" | "cloud"
     current_table: Optional[str] = None
     current_embedding_model: Optional[str] = None
 

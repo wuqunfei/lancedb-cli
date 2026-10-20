@@ -4,7 +4,23 @@
 database and a table visually, then run slash commands against whatever's selected — no
 more retyping paths and table names for every single query.
 
-![launch screenshot](https://raw.githubusercontent.com/wuqunfei/lsql/main/docs/screenshots/01-launch.svg)
+Every example below runs against the standard **TPC-H** `customer` table
+(`c_custkey`, `c_name`, `c_address`, `c_nationkey`, `c_phone`, `c_acctbal`,
+`c_mktsegment`, `c_comment`) — generate it yourself with:
+
+```bash
+python scripts/generate_tcph_db.py --path tcph.lance
+```
+
+This seeds a LanceDB database with all 8 TPC-H tables (`region`, `nation`, `supplier`,
+`customer`, `part`, `partsupp`, `orders`, `lineitem`), ~1000 rows each (`nation` and
+`region` are small fixed-size reference tables in the TPC-H spec, so they load in full
+at 25 and 5 rows).
+
+Here's `tcph.lance` open with `customer` selected, after running
+`/query --where "c_mktsegment = 'BUILDING'" --select "c_custkey,c_name,c_acctbal,c_mktsegment" --limit 10`:
+
+![tcph customer query screenshot](https://raw.githubusercontent.com/wuqunfei/lsql/main/docs/screenshots/01-tcph-customer-query.svg)
 
 ---
 
@@ -50,65 +66,29 @@ lsql                      # launch the TUI
 lsql /path/to/database    # launch pre-connected to a database
 ```
 
+No database handy? Generate the TPC-H test database shown throughout this README:
+
+```bash
+python scripts/generate_tcph_db.py --path tcph.lance
+lsql tcph.lance
+```
+
 ---
 
-## 🧭 A tour of the four panels
+## 🧭 The four panels
 
-### 1️⃣ Database — type a path or browse to one
-
-Type a path directly and hit Enter, or click **Open...** to pick a folder visually (with
-an **Up** button to walk back up the directory tree). The 🌙/☀️ icon next to it toggles
-light/dark theme — it defaults to whatever your OS is currently using.
-
-![browse database screenshot](https://raw.githubusercontent.com/wuqunfei/lsql/main/docs/screenshots/02-browse-database.svg)
-
-Opening a path that doesn't exist yet creates a database there — same as running
-`/create --path <path>`.
-
-### 2️⃣ Tables — click to preview
-
-Click any table in the list to select it and immediately see its first 100 rows.
-
-![table selected screenshot](https://raw.githubusercontent.com/wuqunfei/lsql/main/docs/screenshots/03-table-selected.svg)
-
-### 3️⃣ Command input — slash commands with live suggestions
-
-Start typing `/` and a filtered dropdown of matching commands appears. Use `↑`/`↓` to
-pick one, `Tab` or `Enter` to accept it, `Esc` to dismiss. `↑`/`↓` also recall previous
-commands when the dropdown isn't open.
-
-![slash command suggestions screenshot](https://raw.githubusercontent.com/wuqunfei/lsql/main/docs/screenshots/04-slash-suggestions.svg)
-
-Forgot a flag? `/help` lists every command, and `/help <command>` shows its full usage:
-
-![help command screenshot](https://raw.githubusercontent.com/wuqunfei/lsql/main/docs/screenshots/06-help.svg)
-
-### 4️⃣ Results — tables, schemas, and safety checks
-
-`/schema` renders a table's columns and types right in the results panel:
-
-![schema screenshot](https://raw.githubusercontent.com/wuqunfei/lsql/main/docs/screenshots/05-schema.svg)
-
-Destructive commands always confirm first:
-
-![confirm destructive command screenshot](https://raw.githubusercontent.com/wuqunfei/lsql/main/docs/screenshots/07-confirm-destructive.svg)
-
-Large results are paginated — 100 rows per page, with `< Prev` / `Next >` controls:
-
-![pagination screenshot](https://raw.githubusercontent.com/wuqunfei/lsql/main/docs/screenshots/08-pagination.svg)
-
-And if a cell's value is too long to read in the table, double-click it to see the full
-text, copy it, or edit it and write the change back to the table:
-
-![cell detail popup screenshot](https://raw.githubusercontent.com/wuqunfei/lsql/main/docs/screenshots/09-cell-detail.svg)
-
-`/search-vector`, `/search-fts`, and `/search-hybrid` run vector, full-text, or hybrid
-search against the current table — here's
-`/search-hybrid --query "remember to buy groceries" --text-column note` against a
-table of unrelated notes, finding the shopping-list one even though "groceries" never
-appears verbatim:
-
-![search results screenshot](https://raw.githubusercontent.com/wuqunfei/lsql/main/docs/screenshots/10-search-results.svg)
+1. **Database** (top left) — type a path and hit Enter, or click **Connect...** to browse
+   to one. Opening a path that doesn't exist yet creates a database there — same as
+   `/create --path <path>`. The 🌙/☀️ icon toggles light/dark theme.
+2. **Tables** (bottom left) — every table in the open database. Click one to select it
+   and immediately preview its first 100 rows.
+3. **Command input** (bottom) — type `/` for a filtered, live-updating dropdown of
+   matching commands; `↑`/`↓` to navigate it, `Tab`/`Enter` to accept, `Esc` to dismiss.
+   `↑`/`↓` also recall command history when the dropdown isn't open.
+4. **Results** (top right) — renders whatever the last command produced: a data table,
+   schema text, a status message, or a confirmation prompt for destructive commands.
+   Large result sets paginate 100 rows at a time; double-click any cell to see its full
+   value, copy it, or edit it and write the change back to the table.
 
 ---
 
@@ -140,26 +120,116 @@ the command.
 | `/help [command]` | Show all commands, or details for one |
 | `/exit` | Quit |
 
-`/drop`, `/empty`, `/delete`, and `/embedding` pop a confirmation dialog before running
-(`/embedding` always rewrites the whole table under the hood, even without
-`--overwrite`). `/load` and `/embedding` take an explicit `--table` name instead of
-using the current selection — `/load` because it creates a brand-new table,
-`/embedding` because it's often more convenient to target a table other than the one
-currently selected.
+---
 
-`/embedding` uses the model set in the Embedding Model panel by default, or
-`all-MiniLM-L6-v2` if none has been set; `--model` overrides both for a single run.
-With multiple `--source` columns and no `--target`, each gets its own `<source>_vector`
-column.
+## 🧪 Walkthrough: every command against `tcph.lance`
 
-`/search-vector` embeds `--query` with the same model precedence as `/embedding` and runs
-an exact kNN scan — no index required. `--vector-column` is only needed if the table has
-more than one vector column (from repeated `/embedding` runs); with exactly one, it's
-picked automatically. `/search-fts` keyword-searches `--text-column` (required — there's
-no single obvious text column to default to), building its full-text index automatically
-on first use if one doesn't exist yet (same as running `/index --column` on it
-beforehand). `/search-hybrid` runs both and combines them with LanceDB's default RRF
-reranker, so it needs both a vector column (inferred or explicit) and `--text-column`.
+Open `tcph.lance` (generated above), select **customer** in the table list, and work
+through these in order — each one was run for real against the TPC-H `customer` table to
+produce the output shown.
+
+**`/create --path tcph.lance`** opens (or creates) the database — the same thing typing
+the path into the Database panel and hitting Enter does.
+
+**`/schema`** shows the current table's columns and types:
+
+```
+c_custkey: int64
+c_name: large_string
+c_address: large_string
+c_nationkey: int32
+c_phone: large_string
+c_acctbal: double
+c_mktsegment: large_string
+c_comment: large_string
+```
+
+**`/query --where "c_mktsegment = 'BUILDING'" --select "c_custkey,c_name,c_acctbal" --limit 5`**
+filters, projects, and limits the current table:
+
+```
+   c_custkey              c_name  c_acctbal
+0          1  Customer#000000001     711.56
+1          8  Customer#000000008    6819.74
+2         11  Customer#000000011    -272.60
+```
+
+**`/sql SELECT c.c_name, n.n_name FROM customer c JOIN nation n ON c.c_nationkey = n.n_nationkey LIMIT 5`**
+is the one command that ignores the table selection and runs raw SQL (via DuckDB) across
+every table in the database — here joining `customer` against `nation`:
+
+```
+               c_name     n_name
+0  Customer#000000001    MOROCCO
+1  Customer#000000002     JORDAN
+```
+
+**`/update --set-clause "c_mktsegment='ENTERPRISE'" --where "c_custkey = 1"`** updates
+matching rows in place — a follow-up `/query --where "c_custkey = 1" --select "c_mktsegment"`
+confirms customer 1 is now `ENTERPRISE`.
+
+**`/delete --where "c_custkey = 999999"`** deletes matching rows (here, none match, so it
+reports `Deleted 0 row(s)`). `/delete`, along with `/empty`, `/drop`, and `/embedding`,
+pops a confirmation dialog before running.
+
+**`/dump --path customer_export.csv --overwrite`** writes the current table to CSV:
+`Dumped 1000 row(s) from 'customer' to 'customer_export.csv'`.
+
+**`/load --path customer_export.csv --table customer_staging --overwrite`** loads a CSV
+into a brand-new table — `/load` (and `/embedding`) take an explicit `--table` name
+instead of using the current selection, since `/load` creates the table and `/embedding`
+is often pointed at a different table than the one selected.
+
+**`/embedding --table customer --source c_comment --target c_comment_vector`** computes
+vector embeddings for `c_comment` (the only free-text column) into a new
+`c_comment_vector` column, using the model set in the Embedding Model panel, or
+`all-MiniLM-L6-v2` if none is set; `--model org/name` overrides both for a single run.
+With multiple `--source` columns and no `--target`, each gets its own `<source>_vector`.
+
+**`/index --column c_comment`** builds a full-text index on `c_comment` — not required
+before `/search-fts`/`/search-hybrid`, since they build it automatically on first use,
+but worth running once up front if you'll be searching the column repeatedly.
+
+**`/search-vector --query "careful special requests" --vector-column c_comment_vector --limit 3`**
+embeds the query with the same model precedence as `/embedding` and runs an exact kNN
+scan — no index required. `--vector-column` is only needed when a table has more than
+one vector column; `customer` has exactly one, so it's auto-inferred and can be omitted.
+
+**`/search-fts --query "quickly" --text-column c_comment --limit 3`** keyword-searches
+`c_comment`. `--text-column` is always required — there's no single obvious text column
+to default to.
+
+**`/search-hybrid --query "careful special requests" --text-column c_comment --limit 3`**
+runs both and combines them with LanceDB's default RRF reranker, so it needs both a
+vector column (inferred or explicit) and `--text-column`.
+
+**`/refresh`** refreshes the table list and SQL views — useful after creating or dropping
+tables outside of lsql.
+
+**`/help search-fts`** shows a single command's full usage:
+
+```
+Full-text keyword search on the current table (--query ... --text-column ... [--limit/--where/--select])
+
+usage: /search-fts --query QUERY --text-column TEXT_COLUMN [--limit LIMIT]
+                   [--where WHERE] [--select SELECT]
+
+options:
+  --query QUERY         Keyword search query
+  --text-column TEXT_COLUMN
+                        Text column to search — auto-creates its FTS index on
+                        first use
+  --limit LIMIT         Number of rows to return
+  --where WHERE         WHERE clause filter (SQL syntax)
+  --select SELECT       Columns to select (comma-separated)
+```
+
+**`/empty`** then **`/drop`** clean up the disposable `customer_staging` table created
+above — `Emptied 'customer_staging' — deleted 1000 row(s)` followed by
+`Dropped table 'customer_staging'`. Running either against `customer` itself would ask
+for confirmation first, given it's destructive.
+
+**`/exit`** quits lsql.
 
 ---
 
@@ -177,7 +247,7 @@ Run the tests:
 pytest
 ```
 
-Regenerate the screenshots above after a visible UI change:
+Regenerate the screenshot above after a visible UI change:
 
 ```bash
 python scripts/generate_screenshots.py

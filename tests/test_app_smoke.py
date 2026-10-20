@@ -40,7 +40,7 @@ def make_app(tmp_path, initial_db_path=None):
     user's real ~/.config/lsql/."""
     return LanceDBApp(
         initial_db_path=initial_db_path,
-        recent_databases=persistence.RecentDatabases(path=tmp_path / "recent.json"),
+        connection_history=persistence.ConnectionHistory(path=tmp_path / "recent.json"),
         command_history=persistence.CommandHistory(path=tmp_path / "history.json"),
         last_embedding_model=persistence.LastEmbeddingModel(path=tmp_path / "last_model.json"),
     )
@@ -174,11 +174,11 @@ async def test_create_command_opens_database_and_populates_table_list(tmp_path, 
 
 async def test_open_button_opens_and_cancel_closes_modal(tmp_path):
     app = make_app(tmp_path)
-    async with app.run_test() as pilot:
+    async with app.run_test(size=(120, 45)) as pilot:
         await pilot.click("#open-db-button")
         await pilot.pause()
         assert len(app.screen_stack) == 2
-        await pilot.click("#browser-cancel")
+        await pilot.click("#connect-cancel")
         await pilot.pause()
         assert len(app.screen_stack) == 1
         assert app.state.current_db_path is None
@@ -192,16 +192,19 @@ async def test_submitting_typed_path_keeps_path_in_input(tmp_path, db_with_table
         assert app.query_one("#db-path-input").value == db_with_table
 
 
-async def test_opening_via_folder_browser_fills_in_input(tmp_path, db_with_table):
+async def test_opening_via_connect_modal_fills_in_input(tmp_path, db_with_table):
     app = make_app(tmp_path)
-    async with app.run_test() as pilot:
-        # Pre-fill the path so the browser opens with db_with_table pre-selected,
-        # then "Open" on the modal confirms that same path without navigating.
+    async with app.run_test(size=(120, 45)) as pilot:
+        # Pre-fill the path so the Connect modal's Local Folder tab opens with
+        # db_with_table pre-selected, then "Connect" confirms that same path.
         app.query_one("#db-path-input").value = db_with_table
         await pilot.click("#open-db-button")
         await pilot.pause()
-        await pilot.click("#browser-open")
-        await pilot.pause()
+        await pilot.click("#connect-confirm")
+        for _ in range(20):
+            await pilot.pause(0.2)
+            if len(app.screen_stack) == 1:
+                break
         assert app.state.current_db_path == db_with_table
         assert app.query_one("#db-path-input").value == db_with_table
 

@@ -12,6 +12,7 @@ from ..commands import registry
 from ..commands import results as cmdresults
 from ..commands.results import AppState, CommandResult
 from ..core import db
+from ..core.connection import ConnectionRequest
 from ..core.exceptions import CommandError
 from ..core.parsing import convert_value
 from ..core.system_theme import system_prefers_dark
@@ -35,13 +36,13 @@ class LanceDBApp(App):
     def __init__(
         self,
         initial_db_path: Optional[str] = None,
-        recent_databases: Optional[persistence.RecentDatabases] = None,
+        connection_history: Optional[persistence.ConnectionHistory] = None,
         command_history: Optional[persistence.CommandHistory] = None,
         last_embedding_model: Optional[persistence.LastEmbeddingModel] = None,
     ):
         super().__init__()
         self.state = AppState()
-        self.recent_dbs = recent_databases or persistence.RecentDatabases()
+        self.recent_dbs = connection_history or persistence.ConnectionHistory()
         self.history_store = command_history or persistence.CommandHistory()
         self.last_embedding_model = last_embedding_model or persistence.LastEmbeddingModel()
         self._initial_db_path = initial_db_path
@@ -73,6 +74,10 @@ class LanceDBApp(App):
         if last_model:
             self.state.current_embedding_model = last_model
             self.query_one(EmbeddingModelPanel).set_model_name(last_model)
+        else:
+            # Pre-fill the field with what /embedding and /search-* would fall back to
+            # anyway, so the panel never looks blank/unset on first launch.
+            self.query_one(EmbeddingModelPanel).set_model_name(db.DEFAULT_EMBEDDING_MODEL)
         self.query_one(CommandInputPanel).focus_input()
 
     def action_focus_command(self) -> None:
@@ -84,7 +89,7 @@ class LanceDBApp(App):
 
     @on(DatabasePanel.DatabaseSelected)
     def handle_database_selected(self, event: DatabasePanel.DatabaseSelected) -> None:
-        self._open_database(event.path)
+        self._open_database(event.request)
 
     @on(EmbeddingModelPanel.ModelSelected)
     def handle_embedding_model_selected(self, event: EmbeddingModelPanel.ModelSelected) -> None:
@@ -113,12 +118,12 @@ class LanceDBApp(App):
     @work
     async def handle_command_submitted(self, event: Input.Submitted) -> None:
         line = event.value.strip()
-        self.query_one(CommandInputPanel).clear_input()
         if not line:
             return
+        self.query_one(CommandInputPanel).finish_submit()
         history = self.history_store.add(line)
         self.query_one(CommandInputPanel).set_history(history)
-        await self._run_command_line(line)
+        await self._run_command_line(line, notify_outcome=True)
 
     @on(ResultsPanel.CellUpdateRequested)
     @work
@@ -137,13 +142,17 @@ class LanceDBApp(App):
         if self._last_command_line:
             await self._run_command_line(self._last_command_line)
 
-    async def _run_command_line(self, line: str) -> None:
+    async def _run_command_line(self, line: str, notify_outcome: bool = False) -> None:
         self._last_command_line = line
+        if notify_outcome:
+            cmd_name = line.split(None, 1)[0]
+            self.notify(f"Running {cmd_name}...", title="Running", timeout=2)
+
         prepared = registry.prepare(self.state, line)
         if prepared is None:
             return
         if isinstance(prepared, CommandResult):
-            self._show_result(prepared)
+            self._show_result(prepared, notify_outcome=notify_outcome)
             return
 
         if prepared.confirm_message:
@@ -151,7 +160,7 @@ class LanceDBApp(App):
                 result = await self.push_screen_wait(
                     ConfirmProgressModal(prepared.confirm_message, lambda: registry.execute(prepared))
                 )
-                self._show_result(result)
+                self._show_result(result, notify_outcome=notify_outcome)
                 return
             confirmed = await self.push_screen_wait(ConfirmModal(prepared.confirm_message))
             if not confirmed:
@@ -159,31 +168,44 @@ class LanceDBApp(App):
                 return
 
         result = registry.execute(prepared)
-        self._show_result(result)
+        self._show_result(result, notify_outcome=notify_outcome)
 
-    def _show_result(self, result: CommandResult) -> None:
+    def _show_result(self, result: CommandResult, notify_outcome: bool = False) -> None:
         if result.kind == "exit":
             self.exit()
             return
         if result.opened_db_path and not self._open_database(result.opened_db_path):
+            if notify_outcome:
+                self.notify(
+                    f"Could not open '{result.opened_db_path}'", title="Failed", severity="error", timeout=4
+                )
             return  # _open_database already rendered the error
         self.query_one(ResultsPanel).show_result(result)
         if result.refresh_tables:
             self._refresh_table_list()
+        if not notify_outcome:
+            return
+        if result.kind == "error":
+            self.notify(str(result.renderable), title="Failed", severity="error", timeout=4)
+        else:
+            self.notify("Executed", severity="information", timeout=3)
 
-    def _open_database(self, path: str) -> bool:
+    def _open_database(self, request) -> bool:
+        if isinstance(request, str):
+            request = ConnectionRequest.local(request)
         try:
-            conn = db.connect(path)
+            conn = db.connect_request(request)
         except CommandError as e:
             self.query_one(ResultsPanel).show_result(cmdresults.error(str(e)))
             return False
         self.state.connection = conn
-        self.state.current_db_path = path
+        self.state.current_db_path = request.uri
+        self.state.current_connection_kind = request.kind
         self.state.current_table = None
-        self.recent_dbs.add(path)
+        self.recent_dbs.add(request)
         self.query_one(ResultsPanel).clear()
-        self.query_one(CommandInputPanel).set_status(path, None)
-        self.query_one(DatabasePanel).set_path(path)
+        self.query_one(CommandInputPanel).set_status(request.uri, None)
+        self.query_one(DatabasePanel).set_path(request.uri)
         self._refresh_table_list()
         return True
 

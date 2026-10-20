@@ -10,22 +10,57 @@ import numpy as np
 import pandas as pd
 import pyarrow as pa
 
+from .connection import ConnectionRequest
 from .exceptions import CommandError
 
 DEFAULT_EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 
 
-def connect(db_path: str) -> lancedb.DBConnection:
-    """Connect to (and implicitly create, if missing) a LanceDB database directory."""
+def connect(
+    uri: str,
+    *,
+    api_key: Optional[str] = None,
+    region: Optional[str] = None,
+    host_override: Optional[str] = None,
+    storage_options: Optional[Dict[str, str]] = None,
+) -> lancedb.DBConnection:
+    """Connect to (and implicitly create, if missing) a LanceDB database — local path,
+    object-storage URI, or LanceDB Cloud/Enterprise db:// URI."""
+    kwargs: Dict[str, Any] = {}
+    if api_key is not None:
+        kwargs["api_key"] = api_key
+    if region is not None:
+        kwargs["region"] = region
+    if host_override is not None:
+        kwargs["host_override"] = host_override
+    if storage_options:
+        kwargs["storage_options"] = storage_options
     try:
-        return lancedb.connect(db_path)
+        return lancedb.connect(uri, **kwargs)
     except Exception as e:
-        raise CommandError(f"Could not open database at '{db_path}': {e}")
+        raise CommandError(f"Could not open database at '{uri}': {e}")
+
+
+def connect_request(req: ConnectionRequest) -> lancedb.DBConnection:
+    """Open a connection described by a ConnectionRequest (the 3-way Connect UI's output)."""
+    if req.kind == "cloud":
+        return connect(req.uri, api_key=req.api_key, region=req.region, host_override=req.host_override)
+    if req.kind == "object_storage":
+        return connect(req.uri, storage_options=req.storage_options or None)
+    return connect(req.uri)
 
 
 def list_tables(conn: lancedb.DBConnection) -> List[str]:
-    """Return the sorted list of table names in a database."""
-    result = conn.list_tables()
+    """Return the sorted list of table names in a database.
+
+    Object-storage/cloud connections don't validate credentials at connect() time —
+    only a real round-trip call like this one does — so this is also the place that
+    surfaces auth/network failures, not just a missing/renamed directory.
+    """
+    try:
+        result = conn.list_tables()
+    except Exception as e:
+        raise CommandError(f"Could not list tables: {e}")
     names = result.tables if hasattr(result, "tables") else result
     return sorted(names)
 
