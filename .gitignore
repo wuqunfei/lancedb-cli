@@ -65,3 +65,4 @@ venv.bak/
 # Project specific
 .lancedb_history
 *.db
+*.lance/
